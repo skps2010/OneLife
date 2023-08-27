@@ -1,23 +1,22 @@
-This script will automate the process of git-pulling and installing your own 
-server on a GNU/Linux machine.
+该脚本将自动执行 git-pull 和安装您自己的过程
+位于GNU/Linux 机器上的服务器。
 
-Make a folder for it first, like this:
+首先为其创建一个文件夹，如下所示：
 
 mkdir myServer
 
-Make sure you have read/write permissions to this folder, assuming that your 
-user account will be running the server.  If the server is going to be run
-by some other account instead, make sure THAT account has read-write
-permissions.
+确保您对此文件夹具有读/写权限，假设您的
+用户帐户将运行服务器。 如果服务器要运行
+由其他帐户代替，请确保该帐户具有读写权限
+权限。
 
-
-Then copy this script into that folder.  Suppose myServer is in your home
-directory:
+然后将此脚本复制到该文件夹中。 假设 myServer 在您主机中目录：
 
 cp serverPullAndBuild.sh ~/myServer
 
-
-Now change to that directory and run the script:
+现在切换到该目录并运行脚本：
 
 cd ~/myServer
-bash serverPullAndBuild.sh
+bash severPullAndBuild.sh
+
+等待，然后就完成了。
