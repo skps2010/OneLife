@@ -19,9 +19,11 @@ jobs:
       - name: packages
         run: |
           sudo apt-get update
-          sudo apt-get install git g++ make imagemagick xclip libsdl1.2-dev libglu1-mesa-dev libgl1-mesa-dev mingw-w64 libfreetype-dev
+          sudo apt-get install git g++ make imagemagick xclip libsdl1.2-dev libglu1-mesa-dev libgl1-mesa-dev g++-mingw-w64-i686-win32 libfreetype-dev
       - name: scripts
         run: |
+          ls
+          pwd
           cp OneLife/scripts/skps2010Scripts/skps2010Build.sh .
           ./skps2010Build.sh
           ./cleanOldBuilds.sh
@@ -54,7 +56,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: OneLife_Windows_v${{ inputs.version }}.zip
           asset_name: OneLife_Windows_v${{ inputs.version }}.zip
           asset_content_type: application/zip
