@@ -35,10 +35,15 @@ git checkout .
 latestTaggedVersionB=`git for-each-ref --sort=-creatordate --format '%(refname:short)' --count=1 refs/tags/OneLife_v* | sed -e 's/OneLife_v//'`
 git checkout -q OneLife_v$latestTaggedVersionB
 
+latestVersion=$latestTaggedVersionB
+
+if [ "$1" = "pull_only" ]; then
+	echo "Done pulling v$latestVersion"
+	exit
+fi
+
 rm */cache.fcz
 
-
-latestVersion=$latestTaggedVersionB
 
 # if [ "$latestTaggedVersionA" -gt "$latestTaggedVersionB" ]
 # then

@@ -24,8 +24,7 @@ jobs:
         run: |
           cd ../
           cp OneLife/scripts/skps2010Scripts/skps2010Build.sh .
-          ./skps2010Build.sh
-          ./cleanOldBuilds.sh
+          ./skps2010Build.sh pull_only
           ./makeWindows.sh ${{ inputs.version }}
       - name: test dir
         run: |
@@ -56,6 +55,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: OneLife_Windows_v${{ inputs.version }}.zip
+          asset_path: ../OneLife_Windows_v${{ inputs.version }}.zip
           asset_name: OneLife_Windows_v${{ inputs.version }}.zip
           asset_content_type: application/zip
