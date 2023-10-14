@@ -65,7 +65,7 @@ jobs:
       - name: scripts
         shell: cmd
         run: |
-          set PYTHONIOENCODING=utf8
+          set PYTHONUTF8=1
           set version=${{ inputs.version }}
           echo https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
 
@@ -74,7 +74,7 @@ jobs:
           tar -xf OneLife_Windows_v%version%.zip
           echo after tar
           pip3 install requests
-          (echo 2 && echo 1) | python3 -X utf8 OneLife_v%version%\translator.py
+          (echo 2 && echo 1) | OneLife_v%version%\translator.exe
           echo after translate
           
           curl --silent -o make_zh_cn.iss https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/make_zh_cn.iss
@@ -85,12 +85,12 @@ jobs:
           is.exe /verysilent /currentuser /dir=./
           curl --silent -o ChineseSimplified.isl https://raw.githubusercontent.com/kira-96/Inno-Setup-Chinese-Simplified-Translation/main/ChineseSimplified.isl
           dir
-          copy ChineseSimplified.isl "Inno Setup 6\Languages"
+          copy ChineseSimplified.isl Languages
           echo after install
 
           echo #define MyAppVersion "%version%" > work.iss
           type make_zh_cn.iss >> work.iss
-          \"Inno Setup 6\ISCC.exe" work.iss
+          ISCC.exe work.iss
       - name: test dir
         run: |
           ls
