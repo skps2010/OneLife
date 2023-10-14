@@ -73,7 +73,8 @@ jobs:
           echo after curl
           tar -xf OneLife_Windows_v%version%.zip
           echo after tar
-          (echo 2 && echo 1) | OneLife_v%version%\translator.exe
+          pip3 install requests
+          (echo 2 && echo 1) | python3 -X utf8 OneLife_v%version%\translator.py
           echo after translate
           
           curl --silent -o make_zh_cn.iss https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/make_zh_cn.iss
@@ -81,15 +82,15 @@ jobs:
           
           curl --silent -L -o is.exe https://jrsoftware.org/download.php/is.exe
           echo after download
-          is.exe /verysilent /currentuser
+          is.exe /verysilent /currentuser /dir=./
           curl --silent -o ChineseSimplified.isl https://raw.githubusercontent.com/kira-96/Inno-Setup-Chinese-Simplified-Translation/main/ChineseSimplified.isl
-          dir %HOMEPATH%\AppData\Local\Programs
-          copy ChineseSimplified.isl "%HOMEPATH%\AppData\Local\Programs\Inno Setup 6\Languages"
+          dir
+          copy ChineseSimplified.isl "Inno Setup 6\Languages"
           echo after install
 
           echo #define MyAppVersion "%version%" > work.iss
           type make_zh_cn.iss >> work.iss
-          \"%HOMEPATH%\AppData\Local\Programs\Inno Setup 6\ISCC.exe" work.iss
+          \"Inno Setup 6\ISCC.exe" work.iss
       - name: test dir
         run: |
           ls
