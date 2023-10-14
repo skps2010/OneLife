@@ -1,0 +1,60 @@
+name: CI
+
+on: 
+  workflow_dispatch:
+    inputs:
+      version:
+        description: version
+        required: true
+        type: string
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+      fail-fast: true
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install git g++ make imagemagick xclip libsdl1.2-dev libglu1-mesa-dev libgl1-mesa-dev mingw-w64 libfreetype-dev
+      - name: scripts
+        run: |
+          cp OneLife/scripts/skps2010Scripts/skps2010Build.sh .
+          ./skps2010Build.sh
+          ./cleanOldBuilds.sh
+          ./makeWindows.sh ${{ inputs.version }}
+      - name: test dir
+        run: |
+          ls
+      - name: create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ inputs.version }}
+          release_name: v${{ inputs.version }}
+          body: |
+            Update to v${{ inputs.version }}.
+
+            This is for One Hour One Life v${{ inputs.version }}.
+            How to install: https://github.com/skps2010/OneLife/#how-to-use
+            
+            升級到 v${{ inputs.version }}。
+            
+            這對應到 One Hour One Life v${{ inputs.version }}
+            如何安裝：
+            https://github.com/skps2010/OneLife/#如何使用正體
+            https://github.com/skps2010/OneLife/#如何使用简体
+      - name: upload windows #WINDOWS
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
+          asset_path: OneLife_Windows_v${{ inputs.version }}.zip
+          asset_name: OneLife_Windows_v${{ inputs.version }}.zip
+          asset_content_type: application/zip
