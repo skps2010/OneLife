@@ -80,6 +80,9 @@ jobs:
           
           echo #define MyAppVersion "%version%" > work.iss
           type make_zh_cn.iss >> work.iss
+          echo "%HOMEPATH%
+          dir
+          type work.iss
           "%HOMEPATH%\AppData\Local\Programs\Inno Setup 6\ISCC.exe" work.iss
       - name: test dir
         run: |
