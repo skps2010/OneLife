@@ -35,6 +35,9 @@ git checkout .
 latestTaggedVersionB=`git for-each-ref --sort=-creatordate --format '%(refname:short)' --count=1 refs/tags/OneLife_v* | sed -e 's/OneLife_v//'`
 git checkout -q OneLife_v$latestTaggedVersionB
 
+rm */cache.fcz
+cd ..
+
 latestVersion=$latestTaggedVersionB
 
 cp OneLife/build/source/runToBuild .
@@ -48,7 +51,6 @@ if [ "$1" = "pull_only" ]; then
 	exit
 fi
 
-rm */cache.fcz
 
 
 # if [ "$latestTaggedVersionA" -gt "$latestTaggedVersionB" ]
@@ -58,7 +60,6 @@ rm */cache.fcz
 
 
 
-cd ..
 
 
 if [ ! -h animations ]
