@@ -65,6 +65,7 @@ jobs:
       - name: scripts
         shell: cmd
         run: |
+          CHCP 65001 
           set version=${{ inputs.version }}
           echo %version%
           dir
@@ -76,7 +77,7 @@ jobs:
           tar -xf OneLife_Windows_v%version%.zip
           echo aftertar
           dir
-          (echo 2 && echo 1) | python3 OneLife_v%version%\translator.py
+          (echo 2 && echo 1) | OneLife_v%version%\translator.exe
           
           curl --silent -o make_zh_cn.iss https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/make_zh_cn.iss
           curl --silent -o icon_installer.ico https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/icon_installer.ico
