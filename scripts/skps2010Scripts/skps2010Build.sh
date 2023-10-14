@@ -45,6 +45,7 @@ cp OneLife/scripts/skps2010Scripts/cleanOldBuilds.sh .
 cp OneLife/scripts/skps2010Scripts/makeWindows.sh .
 cp OneLife/scripts/skps2010Scripts/makeMacOSX.sh .
 cp OneLife/scripts/skps2010Scripts/translator.py .
+cp OneLife/scripts/skps2010Scripts/translator .
 
 if [ "$1" = "pull_only" ]; then
 	echo "Done pulling v$latestVersion"
