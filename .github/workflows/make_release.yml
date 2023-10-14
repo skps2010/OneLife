@@ -68,8 +68,9 @@ jobs:
           set version=${{ inputs.version }}
           echo %version%
           dir
+          echo https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
 
-          curl -o OneLife_Windows_v%version%.zip https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
+          curl -L -o OneLife_Windows_v%version%.zip https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
           echo aftercurl
           dir
           tar -xf OneLife_Windows_v%version%.zip
