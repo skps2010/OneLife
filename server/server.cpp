@@ -8586,6 +8586,27 @@ static char nextLogInTwin = false;
 static int firstTwinID = -1;
 
 
+
+
+
+static char isEmailAliveButDisconnected( char *inEmail ) {
+    
+    for( int i=0; i<players.size(); i++ ) {
+        LiveObject *o = players.getElement( i );
+        
+        if( ! o->error && ! o->connected &&
+            strcmp( o->email, inEmail ) == 0 ) {
+            
+            return true;
+            }
+        }
+
+    return false;
+    }
+
+
+
+
 // inAllowOrForceReconnect is 0 for forbidden reconnect, 1 to allow, 
 // 2 to require
 // returns ID of new player,
@@ -9670,6 +9691,36 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
         if( femaleID == -1 ) {       
             // all races present, or couldn't find female character
             // to use in weakest race
+
+            // just pick a race at random
+            // since they have been shuffled above, picking the first
+            // race will be a random one
+            int randomRace = races[0];
+            
+            // then pick a random female of that race
+            femaleID = getRandomPersonObjectOfRace( randomRace );
+            
+            int tryCount = 0;
+            while( getObject( femaleID )->male && tryCount < 10 ) {
+                femaleID = getRandomPersonObjectOfRace( randomRace );
+                tryCount++;
+                }
+            if( getObject( femaleID )->male ) {
+                femaleID = -1;
+                }
+            }
+        
+        
+        if( femaleID == -1 ) {       
+            // above thing where we picked a random race failed
+            // maybe we got unlucky and picked males 10x in a row
+
+            // default here to just picking a random female of any race
+        
+            // note that this results in an uneven distribution of Eves
+            // amoung races, because some races have more female characters
+            // than others (but this is okay in this rare edge case).
+
             femaleID = getRandomFemalePersonObject();
             }
         
@@ -17516,24 +17567,37 @@ static char messageFloodCheck( LiveObject *inPlayer, messageType inType ) {
     
     inPlayer->messageFloodBatchCount[index] ++;
 
+
+    if( inPlayer->messageFloodBatchCount[index] >= maxMessageRate ) {
+        // player has sent more than the max number of messages during
+        // the current time batch
+
+        // cut them off whenever they cross this limit, even if the current
+        // time batch is far from ending
+        
+        // (like if they send 40 messages in the first second, don't
+        //  wait for 5 more seconds to pass before counting them as flooding)
+
+        // start a new batch
+        // (so they have a clean slate if they reconnect)
+        inPlayer->messageFloodBatchStartTime[index] = Time::getCurrentTime();
+        inPlayer->messageFloodBatchCount[index] = 0;
+
+        return true;
+        }
+
+
     double curTime = Time::getCurrentTime();
-
-
-    char flooding = false;
 
     if( curTime - inPlayer->messageFloodBatchStartTime[index] >= 5 ) {
         // a 5-second batch is finished
-
-        if( inPlayer->messageFloodBatchCount[index] >= maxMessageRate ) {
-            flooding = true;
-            }
         
         // start a new batch
         inPlayer->messageFloodBatchStartTime[index] = curTime;
         inPlayer->messageFloodBatchCount[index] = 0;
         }
 
-    return flooding;
+    return false;
     }
 
 
@@ -18853,7 +18917,18 @@ int main() {
                     delete [] nextConnection->clientTag;
                     nextConnection->clientTag = NULL;
                     
+                    if( isEmailAliveButDisconnected( nextConnection->email ) ) {
+                        // don't allow new twin logins from anyone who
+                        // still has an existing life going
+                        
+                        // just ignore their twin request, and connect
+                        // them back to the same life again.
 
+                        // we will delete any twinCode below, since count is 0
+                        nextConnection->twinCount = 0;
+                        }                    
+
+                    
                     if( nextConnection->twinCode != NULL
                         && 
                         nextConnection->twinCount > 0 ) {
@@ -20618,7 +20693,43 @@ int main() {
                             delete [] psMessage;
                             }
                         }
+                    else if( topLeaderO != NULL && topLeaderO == nextPlayer ) {
+                        // they are the top leader themselves
+                        char *topLeaderName = 
+                                getLeadershipName( topLeaderO );
+                        
+                        char *psMessage;
+
+                        if( topLeaderName != NULL ) {
+                            // they have followers and thus a title
+                            psMessage = 
+                                autoSprintf( "PS\n"
+                                             "%d/0 I AM THE %s "
+                                             "OF MY FOLLOWERS\n#",
+                                             nextPlayer->id,
+                                             topLeaderName );
+                            
+                            delete [] topLeaderName;
+                            }
+                        else {
+                            // title NULL means they have no followers
+                            psMessage = 
+                                autoSprintf( "PS\n"
+                                             "%d/0 +NO LEADER+\n#",
+                                             nextPlayer->id );
+                            }
+                        
+                        sendMessageToPlayer( nextPlayer, 
+                                             psMessage, 
+                                             strlen( psMessage ) );
+                        delete [] psMessage;
+                        } 
                     else {
+                        // seems like this case will never happen
+                        // seems like top leader is always player themselves
+                        // if they have no leader, so previous case will
+                        // handle that.
+                        
                         char *psMessage = 
                             autoSprintf( "PS\n"
                                          "%d/0 +NO LEADER+\n#",

@@ -554,7 +554,7 @@ noAllyCountMessage "YOU HAVE NO ALLIES."
 
 
 
-orderCommand "ORDER,"
+orderPrefix "ORDER,"
 
 
 

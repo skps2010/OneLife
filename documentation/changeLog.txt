@@ -4,6 +4,54 @@ http://onehouronelife.com/updateLog.php
 
 
 
+Version ???    ???
+
+--Fixed ambiguity in English.txt file with two orderCommand values defined.
+  Fixes #950
+
+
+
+Editor Fixes:
+
+--Pickers now show 4 lines of text per item until mouse-over, when text of
+  moused item is expanded.  No more overlapping text in pickers, for items
+  with long descriptions.
+
+--Description field in Object Editor automatically rewinds to start of field
+  when a new object is loaded (it used to auto-position at the end of the text
+  description).
+
+
+
+
+Server Fixes:
+
+--Fixed so that if you disconnect and re-join the game, you always rejoin an
+  existing life if you're still alive, even if you request twin status during
+  the re-join.  Before, a request for twin status during rejoin would result in
+  your previous life suddenly ending.  Fixes #934
+
+--When top leader uses the /LEADER command, it now tells them that they are the
+  leader, and tells them their title.  It used to say +NO LEADER+, which was
+  confusing, since that is what is also shown for players who are leaderless.
+  Fixes #936
+
+--Fixed so that when picking female character for Eve, when all races are
+  already evenly represented, with pick a race at random first, and then pick a
+  female character from that race.  Before, we just picked a random female
+  character, but that means that some races get picked more than others
+  (because some races have more female characters than others).  Fixes #938
+
+--Message flood detection improved by not waiting for the full batch time (5
+  seconds) to elapse before checking how many messages have been received
+  during the current time batch.  I.e., if they send more than 40 messages in
+  the first second, we don't wait 4 more seconds before cutting them off.
+  Fixes #939
+
+
+
+
+
 Version 394    2023-October-6
 
 --New /MOTHER command to locate your mother (sometimes she's not your leader,
