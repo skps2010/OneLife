@@ -70,20 +70,20 @@ jobs:
           dir
           echo https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
 
-          curl -L -o OneLife_Windows_v%version%.zip https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
+          curl --silent -L -o OneLife_Windows_v%version%.zip https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
           echo aftercurl
           dir
           tar -xf OneLife_Windows_v%version%.zip
           echo aftertar
           dir
-          (echo 2 && echo 1) | OneLife_v%version%\translator.exe
+          (echo 2 && echo 1) | python3 OneLife_v%version%\translator.py
           
-          curl -o make_zh_cn.iss https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/make_zh_cn.iss
-          curl -o icon_installer.ico https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/icon_installer.ico
+          curl --silent -o make_zh_cn.iss https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/make_zh_cn.iss
+          curl --silent -o icon_installer.ico https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/icon_installer.ico
           
-          curl -L -o is.exe https://jrsoftware.org/download.php/is.exe
+          curl --silent -L -o is.exe https://jrsoftware.org/download.php/is.exe
           is.exe /verysilent /currentuser
-          curl -o ChineseSimplified.isl https://raw.githubusercontent.com/kira-96/Inno-Setup-Chinese-Simplified-Translation/main/ChineseSimplified.isl
+          curl --silent -o ChineseSimplified.isl https://raw.githubusercontent.com/kira-96/Inno-Setup-Chinese-Simplified-Translation/main/ChineseSimplified.isl
           copy ChineseSimplified.isl "%HOMEPATH%\AppData\Local\Programs\Inno Setup 6\Languages"
           
           echo #define MyAppVersion "%version%" > work.iss
