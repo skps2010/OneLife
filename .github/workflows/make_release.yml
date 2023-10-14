@@ -63,6 +63,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: scripts
+        shell: cmd
         run: |
           set version=${{ inputs.version }}
 
