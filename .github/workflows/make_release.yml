@@ -55,7 +55,10 @@ jobs:
           asset_path: ../OneLife_Windows_v${{ inputs.version }}.zip
           asset_name: OneLife_Windows_v${{ inputs.version }}.zip
           asset_content_type: application/zip
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
   build_windows_zh_cn:
+    needs: build_windows
     strategy:
       matrix:
         os: [windows-latest]
@@ -67,26 +70,19 @@ jobs:
         run: |
           set PYTHONUTF8=1
           set version=${{ inputs.version }}
-          echo https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
 
           curl --silent -L -o OneLife_Windows_v%version%.zip https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
-          echo after curl
           tar -xf OneLife_Windows_v%version%.zip
-          echo after tar
-          pip3 install requests
+          
           (echo 2 && echo 1) | OneLife_v%version%\translator.exe
-          echo after translate
           
           curl --silent -o make_zh_cn.iss https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/make_zh_cn.iss
           curl --silent -o icon_installer.ico https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/icon_installer.ico
           
           curl --silent -L -o is.exe https://jrsoftware.org/download.php/is.exe
-          echo after download
           is.exe /verysilent /currentuser /dir=./
           curl --silent -o ChineseSimplified.isl https://raw.githubusercontent.com/kira-96/Inno-Setup-Chinese-Simplified-Translation/main/ChineseSimplified.isl
-          dir
           copy ChineseSimplified.isl Languages
-          echo after install
 
           echo #define MyAppVersion "%version%" > work.iss
           type make_zh_cn.iss >> work.iss
@@ -99,7 +95,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          upload_url: ${{ needs.build_windows.outputs.upload_url }}
           asset_path: OHOL_Simplified_Chinese_v${{ inputs.version }}.zip
           asset_name: OHOL_Simplified_Chinese_v${{ inputs.version }}.zip
           asset_content_type: application/zip
