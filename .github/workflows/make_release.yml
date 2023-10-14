@@ -100,7 +100,7 @@ jobs:
           asset_name: OHOL_Simplified_Chinese_v${{ inputs.version }}.exe
           asset_content_type: application/zip
   build_macos:
-    # needs: build_windows
+    needs: build_windows
     strategy:
       matrix:
         os: [macos-latest]
@@ -111,7 +111,7 @@ jobs:
       - name: packages
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          brew install git sdl12-compat
+          brew install sdl12-compat
       - name: scripts
         run: |
           cd ../
