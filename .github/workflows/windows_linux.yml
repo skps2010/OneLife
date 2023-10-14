@@ -22,8 +22,7 @@ jobs:
           sudo apt-get install git g++ make imagemagick xclip libsdl1.2-dev libglu1-mesa-dev libgl1-mesa-dev g++-mingw-w64-i686-win32 libfreetype-dev
       - name: scripts
         run: |
-          ls
-          pwd
+          cd ../
           cp OneLife/scripts/skps2010Scripts/skps2010Build.sh .
           ./skps2010Build.sh
           ./cleanOldBuilds.sh
