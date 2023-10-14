@@ -37,6 +37,12 @@ git checkout -q OneLife_v$latestTaggedVersionB
 
 latestVersion=$latestTaggedVersionB
 
+cp OneLife/build/source/runToBuild .
+cp OneLife/scripts/skps2010Scripts/cleanOldBuilds.sh .
+cp OneLife/scripts/skps2010Scripts/makeWindows.sh .
+cp OneLife/scripts/skps2010Scripts/makeMacOSX.sh .
+cp OneLife/scripts/skps2010Scripts/translator.py .
+
 if [ "$1" = "pull_only" ]; then
 	echo "Done pulling v$latestVersion"
 	exit
@@ -107,15 +113,6 @@ if [ ! -h dataVersionNumber.txt ]
 then
 	ln -s OneLifeData7/dataVersionNumber.txt .	
 fi
-
-
-
-
-cp OneLife/build/source/runToBuild .
-cp OneLife/scripts/skps2010Scripts/cleanOldBuilds.sh .
-cp OneLife/scripts/skps2010Scripts/makeWindows.sh .
-cp OneLife/scripts/skps2010Scripts/makeMacOSX.sh .
-cp OneLife/scripts/skps2010Scripts/translator.py .
 
 
 if [ "$(uname)" = "Darwin" ]; then
