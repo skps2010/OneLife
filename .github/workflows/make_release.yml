@@ -62,42 +62,31 @@ jobs:
       fail-fast: true
     runs-on: ${{ matrix.os }}
     steps:
-      - run: set version=${{ inputs.version }}
+      - name: scripts
         shell: cmd
-      - run: echo %version%
-        shell: cmd
-      - run: dir
-        shell: cmd
-      - run: echo %PATH%
-        shell: cmd
+        run: |
+          set version=${{ inputs.version }}
+          echo %version%
+          dir
+          echo %PATH%
 
-      - run: curl -o OneLife_Windows_v%version%.zip https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
-        shell: cmd
-      - run: tar -xf OneLife_Windows_v%version%.zip
-        shell: cmd
-      - run: (echo 2 && echo 1) | OneLife_v%version%\translator.exe
-        shell: cmd
+          curl -o OneLife_Windows_v%version%.zip https://github.com/skps2010/OneLife/releases/download/v%version%/OneLife_Windows_v%version%.zip
+          echo aftercurl
+          tar -xf OneLife_Windows_v%version%.zip
+          echo tar
+          (echo 2 && echo 1) | OneLife_v%version%\translator.exe
           
-      - run: curl -o make_zh_cn.iss https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/make_zh_cn.iss
-        shell: cmd
-      - run: curl -o icon_installer.ico https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/icon_installer.ico
-        shell: cmd
+          curl -o make_zh_cn.iss https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/make_zh_cn.iss
+          curl -o icon_installer.ico https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/icon_installer.ico
           
-      - run: curl -L -o is.exe https://jrsoftware.org/download.php/is.exe
-        shell: cmd
-      - run: is.exe /verysilent /currentuser
-        shell: cmd
-      - run: curl -o ChineseSimplified.isl https://raw.githubusercontent.com/kira-96/Inno-Setup-Chinese-Simplified-Translation/main/ChineseSimplified.isl
-        shell: cmd
-      - run: copy ChineseSimplified.isl "%HOMEPATH%\AppData\Local\Programs\Inno Setup 6\Languages"
-        shell: cmd
+          curl -L -o is.exe https://jrsoftware.org/download.php/is.exe
+          is.exe /verysilent /currentuser
+          curl -o ChineseSimplified.isl https://raw.githubusercontent.com/kira-96/Inno-Setup-Chinese-Simplified-Translation/main/ChineseSimplified.isl
+          copy ChineseSimplified.isl "%HOMEPATH%\AppData\Local\Programs\Inno Setup 6\Languages"
           
-      - run: echo #define MyAppVersion "%version%" > work.iss
-        shell: cmd
-      - run: type make_zh_cn.iss >> work.iss
-        shell: cmd
-      - run: \"%HOMEPATH%\AppData\Local\Programs\Inno Setup 6\ISCC.exe" work.iss
-        shell: cmd
+          echo #define MyAppVersion "%version%" > work.iss
+          type make_zh_cn.iss >> work.iss
+          \"%HOMEPATH%\AppData\Local\Programs\Inno Setup 6\ISCC.exe" work.iss
       - name: test dir
         run: |
           ls
