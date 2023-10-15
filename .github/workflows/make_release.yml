@@ -27,13 +27,13 @@ jobs:
           ./skps2010Build.sh pull_only
           
           cd OneLife
-          git remote add upstream https://github.com/jasonrohrer/OneLife
-          git pull upstream master
+          git pull origin test #https://github.com/jasonrohrer/OneLife
+          git push
           cd ../
 
           cd minorGems
-          git remote add upstream https://github.com/jasonrohrer/minorGems
-          git pull upstream master
+          git pull https://github.com/jasonrohrer/minorGems
+          git push
           cd ../
 
           ./makeWindows.sh ${{ inputs.version }}
