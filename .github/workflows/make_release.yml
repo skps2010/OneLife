@@ -30,12 +30,12 @@ jobs:
           git config --global user.email "skps2010030908@yahoo.com"
           git config --global user.name "skps2010"
           git pull origin test
-          git push
+          git push https://oauth2:${{ secrets.GITHUB_TOKEN }}@github.com/skps2010/OneLife.git
           cd ../
 
           cd minorGems
           git pull https://github.com/jasonrohrer/minorGems
-          git push
+          git push https://oauth2:${{ secrets.GITHUB_TOKEN }}@github.com/skps2010/minorGems.git
           cd ../
 
           ./makeWindows.sh ${{ inputs.version }}
