@@ -3,7 +3,7 @@
 + [English](https://github.com/skps2010/OneLife/#English)
 + [正體中文](https://github.com/skps2010/OneLife/#正體中文)
 + [简体中文](https://github.com/skps2010/OneLife/#简体中文)
-+ [Українська мова]() *未完工*
++ [Українська мова]() *not done*
 
 ![Imgur](https://i.imgur.com/LHcp2Qy.png)
 ![Imgur](https://i.imgur.com/9AjlblQ.png)
