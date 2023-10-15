@@ -57,7 +57,7 @@ jobs:
             如何安裝：
             https://github.com/skps2010/OneLife/#如何使用正體
             https://github.com/skps2010/OneLife/#如何使用简体
-      - name: upload windows #WINDOWS
+      - name: upload windows # WINDOWS
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -101,7 +101,7 @@ jobs:
       - name: test dir
         run: |
           ls
-      - name: upload windows #WINDOWS
+      - name: upload windows # WINDOWS
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -129,7 +129,7 @@ jobs:
           cp OneLife/scripts/skps2010Scripts/skps2010Build.sh .
           ./skps2010Build.sh pull_only
           ./makeMacOSX.sh ${{ inputs.version }}
-      - name: upload macos #macOS
+      - name: upload macos # macOS
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
