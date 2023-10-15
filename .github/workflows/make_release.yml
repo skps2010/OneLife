@@ -51,7 +51,7 @@ jobs:
             
             升級到 v${{ inputs.version }}。
             
-            這對應到 One Hour One Life v${{ inputs.version }}
+            這對應到 One Hour One Life v${{ inputs.version }}。
             如何安裝：
             https://github.com/skps2010/OneLife/#如何使用正體
             https://github.com/skps2010/OneLife/#如何使用简体
