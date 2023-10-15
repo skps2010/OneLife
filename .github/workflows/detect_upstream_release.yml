@@ -1,0 +1,25 @@
+name: Get latest release version
+
+on:
+  schedule:
+    - cron:  '45 * * * *'
+jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: check version mismatch
+        id: mismatch
+        run: |
+          jason=`curl --silent https://raw.githubusercontent.com/jasonrohrer/OneLifeData7/master/dataVersionNumber.txt`
+          mine_with_v=`curl --silent https://api.github.com/repos/skps2010/OneLife/releases/latest | jq -r .tag_name`
+          echo ::set-output name=is_mismatch::$([ v"$jason" = $mine_with_v ] && echo "false" || echo "true")
+          echo ::set-output name=version::$jason
+      - name: call make_release
+        if: steps.mismatch.outputs.is_mismatch == 'true'
+        run: |
+          curl \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.PAT }}" \
+            https://api.github.com/repos/skps2010/OneLife/actions/workflows/make_release.yml/dispatches \
+            -d '{"ref":"master", "inputs": { "version":"${{ steps.mismatch.outputs.version }}" }}' 

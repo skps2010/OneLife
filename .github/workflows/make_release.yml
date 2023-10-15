@@ -108,7 +108,6 @@ jobs:
     needs: build_windows
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
       - name: packages
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
