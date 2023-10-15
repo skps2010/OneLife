@@ -25,6 +25,7 @@ jobs:
           cd ../
           cp OneLife/scripts/skps2010Scripts/skps2010Build.sh .
           ./skps2010Build.sh pull_only
+          git config pull.rebase false
           
           cd OneLife
           git pull origin test #https://github.com/jasonrohrer/OneLife
