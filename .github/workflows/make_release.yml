@@ -9,11 +9,7 @@ on:
         type: string
 jobs:
   build_windows:
-    strategy:
-      matrix:
-        os: [ubuntu-latest]
-      fail-fast: true
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - name: packages
         run: |
@@ -29,7 +25,7 @@ jobs:
           git config --global pull.rebase false
           git config --global user.email "skps2010030908@yahoo.com"
           git config --global user.name "skps2010"
-          git pull origin test
+          git pull https://github.com/jasonrohrer/OneLife
           git push https://${{ secrets.PAT }}@github.com/skps2010/OneLife.git
           cd ../
 
@@ -72,11 +68,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
   build_windows_zh_cn:
     needs: build_windows
-    strategy:
-      matrix:
-        os: [windows-latest]
-      fail-fast: true
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
     steps:
       - name: scripts
         shell: cmd
@@ -114,11 +106,7 @@ jobs:
           asset_content_type: application/zip
   build_macos:
     needs: build_windows
-    strategy:
-      matrix:
-        os: [macos-latest]
-      fail-fast: true
-    runs-on: ${{ matrix.os }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
       - name: packages
