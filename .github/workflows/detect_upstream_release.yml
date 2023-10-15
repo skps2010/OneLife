@@ -2,7 +2,7 @@ name: Get latest release version
 
 on:
   schedule:
-    - cron:  '5 * * * *'
+    - cron:  '30 * * * *'
 jobs:
   get-version:
     runs-on: ubuntu-latest
@@ -12,9 +12,10 @@ jobs:
         run: |
           jason=`curl --silent https://raw.githubusercontent.com/jasonrohrer/OneLifeData7/master/dataVersionNumber.txt`
           mine_with_v=`curl --silent https://api.github.com/repos/skps2010/OneLife/releases/latest | jq -r .tag_name`
-          echo is_mismatch=$([ v"$jason" = $mine_with_v ] && echo "false" || echo "true") >> "$GITHUB_OUTPUT"
+          is_mismatch=$([ v"$jason" = $mine_with_v ] && echo "false" || echo "true")
+          echo is_mismatch=$is_mismatch >> "$GITHUB_OUTPUT"
           echo version=$jason >> "$GITHUB_OUTPUT"
-          echo is_mismatch: $is_mismatch, version: $version
+          echo is_mismatch: $is_mismatch, version: $jason
       - name: call make_release
         if: steps.mismatch.outputs.is_mismatch == 'true'
         run: |
