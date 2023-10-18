@@ -11,7 +11,7 @@ jobs:
         id: mismatch
         run: |
           jason=`curl --silent https://raw.githubusercontent.com/jasonrohrer/OneLifeData7/master/dataVersionNumber.txt`
-          mine_with_v=`curl --silent https://api.github.com/repos/skps2010/OneLife/releases/latest | jq -r .tag_name`
+          mine_with_v=`curl --silent https://api.github.com/repos/skps2010/OneLife/releases/latest | jq -r .tag_name | grep -o -e 'v\d*'`
           is_mismatch=$([ v"$jason" = $mine_with_v ] && echo "false" || echo "true")
           echo is_mismatch=$is_mismatch >> "$GITHUB_OUTPUT"
           echo version=$jason >> "$GITHUB_OUTPUT"
