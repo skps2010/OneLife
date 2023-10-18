@@ -50,18 +50,16 @@ cp ../../OneLifeApp $onelife_app
 rm -r mac/OneLife_$1/OneLife_$1.app/Contents/MacOS/empty.txt
 
 # install SDL framework
+t=$'\t'
 framework_folder=mac/OneLife_$1/OneLife_$1.app/Contents/Frameworks
-freetype_folder=/usr/local/opt/freetype/lib
-png_folder=/usr/local/opt/libpng/lib
-SDL_folder=/usr/local/opt/sdl12-compat/lib
-cp $freetype_folder/libfreetype.dylib $framework_folder
-cp $png_folder/libpng.dylib $framework_folder
-cp $SDL_folder/libSDL.dylib $framework_folder
+cp /usr/local/opt/freetype/lib/libfreetype.dylib $framework_folder
+cp /usr/local/opt/libpng/lib/libpng.dylib $framework_folder
+cp /usr/local/opt/sdl12-compat/lib/libSDL.dylib $framework_folder
 
-install_name_tool -change $freetype_folder/`readlink $freetype_folder/libfreetype.dylib` @executable_path/../Frameworks/libfreetype.dylib $onelife_app
-install_name_tool -change $png_folder/`readlink $png_folder/libpng.dylib` @executable_path/../Frameworks/libpng.dylib $framework_folder/libfreetype.dylib
+install_name_tool -change `otool -L $onelife_app | grep -o -e "[^ $t]*freetype[^ $t]*"` @executable_path/../Frameworks/libfreetype.dylib $onelife_app
+install_name_tool -change `otool -L $framework_folder/libfreetype.dylib | grep -o -e "[^ $t]*png[^ $t]*"` @executable_path/../Frameworks/libpng.dylib $framework_folder/libfreetype.dylib
 install_name_tool -id @executable_path/libpng.dylib $framework_folder/libpng.dylib
-install_name_tool -change $SDL_folder/`readlink $SDL_folder/libSDL.dylib` @executable_path/../Frameworks/libSDL.dylib $onelife_app
+install_name_tool -change `otool -L $onelife_app | grep -o -e "[^ $t]*SDL[^ $t]*"` @executable_path/../Frameworks/libSDL.dylib $onelife_app
 
 cp ../scripts/skps2010Scripts/translator.py mac/OneLife_$1
 cp ../scripts/skps2010Scripts/translator mac/OneLife_$1
