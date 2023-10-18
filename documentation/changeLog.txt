@@ -9,6 +9,15 @@ Version ???    ???
 --Fixed ambiguity in English.txt file with two orderCommand values defined.
   Fixes #950
 
+--Gesture maintained when flipping left/right due to mouse movement.
+  Part of #953
+
+--Fixed so that gestures from players don't overwrite each other (which was
+  causing a player's gestures to switch randomly as other players gesture on
+  the same sever).  Fixes #953
+
+
+
 
 
 Editor Fixes:
@@ -48,6 +57,7 @@ Server Fixes:
   the first second, we don't wait 4 more seconds before cutting them off.
   Fixes #939
 
+--Fixed a crash caused by code changes for #938, when picking a new Eve.
 
 
 
