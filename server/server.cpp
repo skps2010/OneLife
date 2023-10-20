@@ -1878,8 +1878,6 @@ char isPlayerIgnoredForEvePlacement( int inID ) {
 
 
 static double pickBirthCooldownSeconds() {
-    return 0;
-    
     // Kumaraswamy distribution
     // PDF:
     // k(x,a,b) = a * b * x**( a - 1 ) * (1-x**a)**(b-1)
@@ -8607,6 +8605,29 @@ static char isEmailAliveButDisconnected( char *inEmail ) {
 
 
 
+static char isNewPlayer( LiveObject *inPlayerObject,
+                         int inMinLives = -1, int inMinHours = -1 ) {
+    
+    if( inMinLives == -1 ) {
+        inMinLives = SettingsManager::getIntSetting( "newPlayerLifeCount", 5 );
+        }
+    if( inMinHours == -1 ) {
+        inMinHours = SettingsManager::getIntSetting( 
+            "newPlayerLifeTotalSeconds",
+            7200 ) / 3600;
+        }
+            
+    if( isUsingStatsServer() && 
+        ! inPlayerObject->lifeStats.error &&
+        ( inPlayerObject->lifeStats.lifeCount < inMinLives ||
+          inPlayerObject->lifeStats.lifeTotalSeconds < inMinHours * 3600 ) ) {
+        return true;
+        }
+    return false;
+    }
+
+
+
 // inAllowOrForceReconnect is 0 for forbidden reconnect, 1 to allow, 
 // 2 to require
 // returns ID of new player,
@@ -8907,6 +8928,9 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
 
     newObject.lastOwnedPositionInformed = -1;
     
+    newObject.curseStatus = inCurseStatus;
+    newObject.lifeStats = inLifeStats;
+
 
     newObject.lastGateVisitorNoticeTime = 0;
     newObject.lastNewBabyNoticeTime = 0;
@@ -8971,6 +8995,16 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
     
     newObject.fitnessScore = inFitnessScore;
     
+
+    if( isNewPlayer( &newObject, 25 ) ) {
+        // if they have lived less than 25 lives, treat their fitness
+        // score as suspect (too few data points, noisy)
+
+        // don't give them any special roles based on a high fitness score
+        newObject.fitnessScore = 0;
+        }
+    
+        
 
 
 
@@ -9489,12 +9523,12 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                    "this player's score is %f, max score in window is %f",
                    recentScoresForPickingEve.size(),
                    recentScoreWindowForPickingEve,
-                   inFitnessScore, maxRecentScore );
+                   newObject.fitnessScore, maxRecentScore );
 
     
     // don't consider forced-spawn offspring as candidates for a needed Eve
     if( forceOffspringLineageID == -1 )
-    if( inFitnessScore >= maxRecentScore )
+    if( newObject.fitnessScore >= maxRecentScore )
     if( parentChoices.size() > 0 ) {
         // make sure one race isn't entirely extinct
         
@@ -9511,7 +9545,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                         "AND player's score (%f) beats/ties "
                         "max score of last %d players (%f), forcing Eve.",
                         races[i],
-                        inFitnessScore,
+                        newObject.fitnessScore,
                         recentScoreWindowForPickingEve,
                         maxRecentScore );
                 
@@ -9526,7 +9560,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
 
     
     if( forceOffspringLineageID == -1 )
-    if( inFitnessScore >= maxRecentScore )
+    if( newObject.fitnessScore >= maxRecentScore )
     if( parentChoices.size() > 0 ) {
         int generationNumber =
             SettingsManager::getIntSetting( "forceEveAfterGenerationNumber",
@@ -9552,7 +9586,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                         "AND player's score (%f) beats/ties "
                         "max score of last %d players (%f), forcing Eve.",
                         minGen, generationNumber,
-                        inFitnessScore,
+                        newObject.fitnessScore,
                         recentScoreWindowForPickingEve,
                         maxRecentScore );    
             parentChoices.deleteAll();
@@ -10366,8 +10400,6 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
     
     newObject.nameHasSuffix = false;
     newObject.lastSay = NULL;
-    newObject.curseStatus = inCurseStatus;
-    newObject.lifeStats = inLifeStats;
     
 
     if( newObject.curseStatus.curseLevel == 0 &&
@@ -10571,13 +10603,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                 "PLEASE HELP THEM LEARN THE GAME.  THANKS!  -JASON",
                 parent );
             }
-        else if( isUsingStatsServer() && 
-                 ! newObject.lifeStats.error &&
-                 ( newObject.lifeStats.lifeCount < 
-                   SettingsManager::getIntSetting( "newPlayerLifeCount", 5 ) ||
-                   newObject.lifeStats.lifeTotalSeconds < 
-                   SettingsManager::getIntSetting( "newPlayerLifeTotalSeconds",
-                                                   7200 ) ) ) {
+        else if( isNewPlayer( &newObject ) ) {
             // a new player (not at a PAX kiosk)
             // let mother know
             char *motherMessage =  
@@ -10940,7 +10966,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
         &&
         newObject.curseStatus.curseLevel == 0 ) {
         
-        addRecentScore( newObject.email, inFitnessScore );
+        addRecentScore( newObject.email, newObject.fitnessScore );
         }
     
 
@@ -21895,6 +21921,9 @@ int main() {
                         m.saidText = cleanedString;
                         
                         
+                        char somePropertyGivingSay = false;
+                        char givingMessageSent = false;
+                        
                         if( nextPlayer->ownedPositions.size() > 0 ) {
                             // consider phrases that assign ownership
                             SimpleVector<LiveObject*> newOwners;
@@ -21903,6 +21932,8 @@ int main() {
                             char *namedOwner = isNamedGivingSay( m.saidText );
                             
                             if( namedOwner != NULL ) {
+                                somePropertyGivingSay = true;
+                                
                                 LiveObject *o =
                                     getPlayerByName( namedOwner, nextPlayer );
                                 
@@ -21927,6 +21958,8 @@ int main() {
                             if( newOwners.size() == 0 ) {
                                 
                                 if( isYouGivingSay( m.saidText ) ) {
+                                    somePropertyGivingSay = true;
+                                
                                     // find closest other player
                                     LiveObject *newOwnerPlayer = 
                                         getClosestOtherPlayer( nextPlayer );
@@ -21936,6 +21969,8 @@ int main() {
                                         }
                                     }
                                 else if( isFamilyGivingSay( m.saidText ) ) {
+                                    somePropertyGivingSay = true;
+                                
                                     // add all family members
                                     for( int n=0; n<players.size(); n++ ) {
                                         LiveObject *o = players.getElement( n );
@@ -21950,6 +21985,8 @@ int main() {
                                         }
                                     }
                                 else if( isOffspringGivingSay( m.saidText ) ) {
+                                    somePropertyGivingSay = true;
+                                    
                                     // add all offspring
                                     for( int n=0; n<players.size(); n++ ) {
                                         LiveObject *o = players.getElement( n );
@@ -21989,6 +22026,9 @@ int main() {
 
                                 if( minDist < 20 ) {
                                     // found one that's not too far away
+
+                                    int numNewOwners = 0;
+                                    
                                     for( int n=0; n<newOwners.size(); n++ ) {
                                         LiveObject *newOwnerPlayer = 
                                             newOwners.getElementDirect( n );
@@ -22004,11 +22044,75 @@ int main() {
                                                 newOwnerPlayer,
                                                 closePos.x, closePos.y,
                                                 "I WAS GIVEN THE" );
+                                            
+                                            numNewOwners++;
                                             }
                                         }
+                                    
+                                    if( numNewOwners > 0 ) {
+                                        
+                                        const char *numberString = "ONE";
+                                        const char *ownerString = "OWNER";
+
+                                        if( numNewOwners > 1 ) {
+                                            ownerString = "OWNERS";
+
+                                            switch( numNewOwners ) {
+                                                case 2:
+                                                    numberString = "TWO";
+                                                    break;
+                                                case 3:
+                                                    numberString = "THREE";
+                                                    break;
+                                                case 4:
+                                                    numberString = "FOUR";
+                                                    break;
+                                                case 5:
+                                                    numberString = "FIVE";
+                                                    break;
+                                                case 6:
+                                                    numberString = "SIX";
+                                                    break;
+                                                default:
+                                                    numberString = "LOTS OF";
+                                                    break;
+                                                }
+                                            }
+                                        
+                                        
+                                        char *message =
+                                            autoSprintf( 
+                                                "PROPERTY NOW HAS %s NEW %s.",
+                                                numberString, ownerString );
+                                        
+                                        sendGlobalMessage( message, 
+                                                           nextPlayer );
+                                        delete [] message;
+                                        givingMessageSent = true;
+                                        }
+                                    }
+                                else {
+                                    const char *message = 
+                                        "NO PROPERTY IS CLOSE ENOUGH.";
+                                    sendGlobalMessage( (char*)message, 
+                                                       nextPlayer );
+                                    givingMessageSent = true;
                                     }
                                 }
                             }
+                        
+                        if( somePropertyGivingSay && ! givingMessageSent ) {
+                            // tried to give property, but no one received
+                            // it
+                            
+                            const char *message = 
+                                "NO ADDITIONAL PEOPLE FOUND TO "
+                                "RECEIVE PROPERTY.";
+                            sendGlobalMessage( (char*)message, nextPlayer );
+                            
+                            givingMessageSent = true;
+                            }
+                        
 
 
                         // they must be holding something to join a posse

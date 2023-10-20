@@ -4,7 +4,7 @@ http://onehouronelife.com/updateLog.php
 
 
 
-Version ???    ???
+Version 397    2023-October-20
 
 --Fixed ambiguity in English.txt file with two orderCommand values defined.
   Fixes #950
@@ -58,6 +58,18 @@ Server Fixes:
   Fixes #939
 
 --Fixed a crash caused by code changes for #938, when picking a new Eve.
+
+--Fixed so that giver gets notice when their gift of property works (or doesn't
+   work).  Before, only receiver got notice.  Fixes #963
+
+--Whoops!  A forced birth cooldown of 0 seconds got pushed back in July 2023.
+  I sometimes do this during local testing, but I forgot to revert it before
+  committing back in July.  Fixed.
+
+--Players who have played less than 25 lives are not given special roles based
+  on their fitness scores.  Fixes #966
+
+
 
 
 
