@@ -276,10 +276,6 @@ const char *getAppName() {
     return "OneLife";
     }
 
-int getAppVersion() {
-    return versionNumber;
-    }
-
 const char *getLinuxAppName() {
     // no dir-name conflict here because we're using all caps for app name
     return "OneLifeApp";
@@ -360,6 +356,12 @@ static void updateDataVersionNumber() {
                 }
             }
         }
+    }
+
+int getAppVersion() {
+    if(dataVersionNumber == 0)
+        updateDataVersionNumber();
+    return versionNumber;
     }
 
 
