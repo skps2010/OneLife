@@ -189,7 +189,6 @@ You can also join [Kook](https://kook.top/E9cHJL).
 
 ***
 ### ukr
-### Англійська
 # OneLife
 Метою цього мода є переклад гри One Hour One Life на різні мови.  
 Він підтримує Unicode та має інструмент перекладу.  
@@ -231,7 +230,7 @@ You can also join [Kook](https://kook.top/E9cHJL).
 
 ## Переклад 
 ### Конспект 
-Всі переклади беруться з цього [Google аркуша](https://docs.google.com/spreadsheets/d/1AH6eZJJ5zkB1zT-iwlomVAUxsa4f7gIgYFS0X265GyM/edit#gid=682688818).  
+Всі переклади беруться з цього [Google sheet](https://docs.google.com/spreadsheets/d/1AH6eZJJ5zkB1zT-iwlomVAUxsa4f7gIgYFS0X265GyM/edit#gid=682688818).  
 Ми намагатимемося оновлювати його щотижня.  
 Ви можете приєднатися до [Discord](https://discord.gg/UFZg3WXGrU), щоб обговорити або повідомити про помилки.  
 Ви також можете приєднатися до [Kook](https://kook.top/E9cHJL).
