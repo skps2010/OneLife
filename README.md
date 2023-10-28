@@ -220,18 +220,18 @@ You can also join [Kook](https://kook.top/E9cHJL).
 
 ## Як увійти за допомогою Steam 
 Звичайний спосіб
-1. Перейдіть на [цю сторінку] (http://onehouronelife.com/steamGate/server.php?action=show_download_link).
+1. Перейдіть на [цю сторінку](http://onehouronelife.com/steamGate/server.php?action=show_download_link).
 2. На цій сторінці вам буде запропоновано увійти через Steam, після чого ви побачите свій обліковий запис і пароль.
 3. Скопіюйте свій обліковий запис і пароль для входу.
 
 Альтернативний спосіб  
 1. Клацніть правою кнопкою миші по грі One Hour One Life у бібліотеці Steam, виберіть "Керування", а потім "Переглянути локальні файли".
-2. З'явиться тека з грою, обліковий запис для входу - у файлі `settings/email.ini, а пароль для входу - у файлі `settings/accountKey.ini.
+2. З'явиться тека з грою, обліковий запис для входу - у файлі `settings/email.ini`, а пароль для входу - у файлі `settings/accountKey.ini`.
 3. Скопіюйте обліковий запис і пароль для входу.
 
 ## Переклад 
 ### Конспект 
-Всі переклади беруться з цього [Google аркуша] (https://docs.google.com/spreadsheets/d/1AH6eZJJ5zkB1zT-iwlomVAUxsa4f7gIgYFS0X265GyM/edit#gid=682688818).  
+Всі переклади беруться з цього [Google аркуша](https://docs.google.com/spreadsheets/d/1AH6eZJJ5zkB1zT-iwlomVAUxsa4f7gIgYFS0X265GyM/edit#gid=682688818).  
 Ми намагатимемося оновлювати його щотижня.  
 Ви можете приєднатися до [Discord](https://discord.gg/UFZg3WXGrU), щоб обговорити або повідомити про помилки.  
 Ви також можете приєднатися до [Kook](https://kook.top/E9cHJL).
