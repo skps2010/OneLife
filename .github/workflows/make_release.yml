@@ -84,10 +84,8 @@ jobs:
           curl --silent -o make_zh_cn.iss https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/make_zh_cn.iss
           curl --silent -o icon_installer.ico https://raw.githubusercontent.com/skps2010/OneLife/master/build/win32/icon_installer.ico
           
-          curl --silent -L -o is.exe https://jrsoftware.org/download.php/is.exe
-          is.exe /verysilent /currentuser /dir=./
           curl --silent -o ChineseSimplified.isl https://raw.githubusercontent.com/kira-96/Inno-Setup-Chinese-Simplified-Translation/main/ChineseSimplified.isl
-          copy ChineseSimplified.isl Languages
+          copy ChineseSimplified.isl "c:\program files (x86)\inno setup 6\Languages"
 
           echo #define MyAppVersion "%version%" > work.iss
           type make_zh_cn.iss >> work.iss
