@@ -1852,6 +1852,13 @@ void checkDrawPos( int inObjectID, doublePair inPos ) {
 
 
 
+static char invertDrawBodyless = false;
+
+
+void toggleInvertDrawBodyless( char inInvert ) {
+    invertDrawBodyless = inInvert;
+    }
+
 
 
 
@@ -1958,8 +1965,10 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
 
 
     // otherEmote (over face) has power to hide head entirely
+    // or hide entire body, including head
     char headless = false;
-    if( headIndex != -1 &&
+    char bodyless = false;
+    if( obj->person &&
         drawWithEmots.size() > 0 &&
         obj->numSprites < MAX_WORKING_SPRITES ) {
         
@@ -1970,6 +1979,9 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
                 
                 if( o->hideHead ) {
                     headless = true;
+                    }
+                if( o->hideBody ) {
+                    bodyless = true;
                     }
                 }
             }
@@ -1995,6 +2007,9 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
                 }
             headlessSkipFlags[headIndex] = true;
             }
+        
+        // don't need a special sprite skip list for bodyless, since
+        // we can just skip drawing all sprites of object
         }
     
     
@@ -2582,6 +2597,19 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
             skipSprite = true;
             }
         
+        
+        // if bodyless, we still go through the motions of drawing
+        // the sprites, to compute their position, etc.
+        // and then just skip the actual drawing part
+
+        // Note that headless works with skipSprite above, and hat
+        // is still drawn.  Not sure why that works differently than
+        // other body parts that have clothing or held objects associated
+        // with them
+
+        // Seems like hands and feet are particularly affected.
+        
+        
 
         if( !inHeldNotInPlaceYet && 
             inHideClosestArm == 1 && 
@@ -3011,6 +3039,29 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
 
 
         if( !skipSprite ) {
+            int spriteID = obj->sprites[i];
+
+            if( bodyless && invertDrawBodyless ) {
+                // start inversion:
+                // draw same inverting rectangle
+                // to invert background colors under sprite that
+                // we are about to draw
+                toggleInvertedBlend( true );
+                        
+                // draw a white rectangle that is big enough
+                // this will invert the underlying background
+                        
+                setDrawColor( 1, 1, 1, 1 );
+                
+                SpriteRecord *sr = getSpriteRecord( spriteID );
+                
+                drawRect( pos, sr->maxD / 2 + 10, sr->maxD / 2 + 10 );
+                
+                toggleInvertedBlend( false );
+                }
+
+
+
             if( spriteColorOverrideOn ) {
                 setDrawColor( spriteColorOverride );
                 }
@@ -3056,7 +3107,6 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
                 toggleAdditiveBlend( true );
                 }
             
-            int spriteID = obj->sprites[i];
             
             if( drawMouthShapes && spriteID == mouthAnchorID &&
                 mouthShapeFrame < numMouthShapeFrames ) {
@@ -3088,8 +3138,12 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
                         f = false;
                         }
                     
-                    drawSprite( sh, pos, 1.0, rot, 
-                                logicalXOR( f, obj->spriteHFlip[i] ) );
+                    // do everything *but* draw the actual 
+                    // sprite when bodyless, so we compute hand and foot
+                    // position, draw shoes, etc.
+                    if( !bodyless || invertDrawBodyless )
+                        drawSprite( sh, pos, 1.0, rot, 
+                                    logicalXOR( f, obj->spriteHFlip[i] ) );
                     }
                 }
             
@@ -3101,6 +3155,27 @@ HoldingPos drawObjectAnim( int inObjectID, int inDrawBehindSlots,
             if( additive ) {
                 toggleAdditiveBlend( false );
                 }
+
+
+            if( bodyless && invertDrawBodyless ) {
+                // finish inversion:
+                // draw same inverting rectangle again
+                // to restore background colors and invert the sprite
+                // that we just drew
+                toggleInvertedBlend( true );
+                        
+                // draw a white rectangle that is big enough
+                // this will invert the underlying background
+                        
+                setDrawColor( 1, 1, 1, 1 );
+                
+                SpriteRecord *sr = getSpriteRecord( spriteID );
+                
+                drawRect( pos, sr->maxD / 2 + 10, sr->maxD / 2 + 10 );
+                
+                toggleInvertedBlend( false );
+                }
+            
 
 
             // this is front-most drawn hand

@@ -4,6 +4,34 @@ http://onehouronelife.com/updateLog.php
 
 
 
+Version 399     2023-October-28
+
+--Support for new GH message.
+
+--Support for destroyed GH cause of death.
+
+--Was depending on headIndex=-1 to detect person for headless/bodyless check,
+  but getHeadIndex never returns -1.  Check if object is a person instead.
+
+
+
+
+Server Fixes:
+
+--Fixed bug that wasn't actually setting cursed status of players that were
+  sent to Donkeytown.  This was causing all kinds of issues (non-Donkeytown
+  players could be born to them as mothers, they were being pointed toward as
+  experts, etc.)  This was apparently covered up for a long time while birth
+  cooldowns were mistakenly set to zero.  Related to #967
+
+--Support for new GH message and sending associated emote.
+
+--Support for GH destroy phrases.
+
+
+
+
+
 Version 397    2023-October-20
 
 --Fixed ambiguity in English.txt file with two orderCommand values defined.

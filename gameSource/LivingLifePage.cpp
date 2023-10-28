@@ -1293,6 +1293,7 @@ typedef enum messageType {
     HOMELAND,
     FLIP,
     CRAVING,
+    GHOST,
     PONG,
     COMPRESSED_MESSAGE,
     UNKNOWN
@@ -1463,6 +1464,9 @@ messageType getMessageType( char *inMessage ) {
         }
     else if( strcmp( copy, "CR" ) == 0 ) {
         returnValue = CRAVING;
+        }
+    else if( strcmp( copy, "GH" ) == 0 ) {
+        returnValue = GHOST;
         }
     
     delete [] copy;
@@ -8003,9 +8007,19 @@ void LivingLifePage::draw( doublePair inViewCenter,
                 
                 ignoreWatchedObjectDraw( true );
 
+
+                if( ourLiveObject->isGhost ) {
+                    // ghosts can see other ghosts
+                    toggleInvertDrawBodyless( true );
+                    }
+                
                 ObjectAnimPack heldPack =
                     drawLiveObject( o, &speakers, &speakersPos );
-                
+
+                if( ourLiveObject->isGhost ) {
+                    toggleInvertDrawBodyless( false );
+                    }
+
                 if( heldPack.inObjectID != -1 ) {
                     // holding something, not drawn yet
                     
@@ -11090,7 +11104,20 @@ void LivingLifePage::draw( doublePair inViewCenter,
     if( showFPS ) {
         timeMeasures[2] += game_getCurrentTime() - drawStartTime;
         }
+
     
+    if( ourLiveObject->isGhost ) {
+        
+        // invert the colors on the ghost's view
+
+        toggleInvertedBlend( true );
+    
+        setDrawColor( 1, 1, 1, 1 );
+        
+        drawSquare( lastScreenViewCenter, inViewSize );
+        
+        toggleInvertedBlend( false );
+        }
     }
 
 
@@ -14457,6 +14484,36 @@ void LivingLifePage::step() {
                 setNewCraving( foodID, bonus );
                 }
             }
+        else if( type == GHOST ) {
+            int numLines;
+            char **lines = split( message, "\n", &numLines );
+            
+            if( numLines > 0 ) {
+                // skip first
+                delete [] lines[0];
+                }
+            
+            for( int i=1; i<numLines; i++ ) {
+                int id;
+                int numRead = sscanf( lines[i], "%d ",
+                                      &( id ) );
+
+                if( numRead == 1 ) {
+                    for( int j=0; j<gameObjects.size(); j++ ) {
+                        if( gameObjects.getElement(j)->id == id ) {
+                            
+                            LiveObject *existing = gameObjects.getElement(j);
+                            
+                            existing->isGhost = true;
+                            
+                            break;
+                            }
+                        }
+                    }
+                delete [] lines[i];
+                }
+            delete [] lines;
+            }
         else if( type == SEQUENCE_NUMBER ) {
             // need to respond with LOGIN message
             
@@ -16802,6 +16859,8 @@ void LivingLifePage::step() {
                 
                 o.isGeneticFamily = false;
                 
+                o.isGhost = false;
+                
 
                 int forced = 0;
                 int done_moving = 0;
@@ -18681,6 +18740,10 @@ void LivingLifePage::step() {
                                 SettingsManager::setSetting( 
                                     "tutorialDone", mTutorialNumber );
                                 }
+                            }
+                        else if( strcmp( reasonString, "exorcism" ) == 0 ) {
+                            mDeathReason = stringDuplicate( 
+                                translate( "reasonExorcism" ) );
                             }
                         else if( strcmp( reasonString, "disconnected" ) == 0 ) {
                             mDeathReason = stringDuplicate( 

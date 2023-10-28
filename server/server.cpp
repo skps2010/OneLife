@@ -228,6 +228,10 @@ static SimpleVector<char*> familyNameGivingPhrases;
 static SimpleVector<char*> eveNameGivingPhrases;
 static SimpleVector<char*> cursingPhrases;
 
+static SimpleVector<char*> ghostDestroyPhrases;
+static SimpleVector<char> ghostDestroyLetters;
+
+
 char *curseYouPhrase = NULL;
 char *curseBabyPhrase = NULL;
 
@@ -292,6 +296,8 @@ static int victimTerrifiedEmotionIndex = 2;
 
 static int starvingEmotionIndex = 2;
 static int satisfiedEmotionIndex = 2;
+
+static int ghostEmotionIndex = 2;
 
 
 static double lastBabyPassedThresholdTime = 0;
@@ -718,6 +724,9 @@ typedef struct LiveObject {
 
         char *lastSay;
 
+        SimpleVector<char*> *usedGhostDestroyLongWords;
+        
+
         CurseStatus curseStatus;
         PastLifeStats lifeStats;
         
@@ -791,6 +800,9 @@ typedef struct LiveObject {
         // time when this player actually died
         double deathTimeSeconds;
         
+        char isGhost;
+        char ghostDestroyed;
+
         
         // the wall clock time when this life started
         // used for computing playtime, not age
@@ -2363,6 +2375,9 @@ void quitCleanup() {
             delete [] nextPlayer->lastSay;
             }
         
+        nextPlayer->usedGhostDestroyLongWords->deallocateStringElements();
+        delete nextPlayer->usedGhostDestroyLongWords;
+
         if( nextPlayer->email != NULL  ) {
             delete [] nextPlayer->email;
             }
@@ -2476,6 +2491,9 @@ void quitCleanup() {
     eveNameGivingPhrases.deallocateStringElements();
     cursingPhrases.deallocateStringElements();
     
+    ghostDestroyPhrases.deallocateStringElements();
+    
+
     forgivingPhrases.deallocateStringElements();
     youForgivingPhrases.deallocateStringElements();
 
@@ -3799,14 +3817,69 @@ double computeAge( double inLifeStartTimeSeconds ) {
 
 
 
+
+static SimpleVector<int> newEmotPlayerIDs;
+static SimpleVector<int> newEmotIndices;
+// 0 if no ttl specified
+static SimpleVector<int> newEmotTTLs;
+
+
+
+static SimpleVector<int> newGhostPlayers;
+
+
 double computeAge( LiveObject *inPlayer ) {
     double age = computeAge( inPlayer->lifeStartTimeSeconds );
+
+    if( inPlayer->isGhost &&
+        ! inPlayer->ghostDestroyed ) {
+        
+        // surviving ghost, age fixed
+        return forceDeathAge;
+        }
+    
+
     if( age >= forceDeathAge ) {
-        setDeathReason( inPlayer, "age" );
         
-        inPlayer->error = true;
         
+        if( ! inPlayer->ghostDestroyed && 
+            ! inPlayer->isGhost &&
+            SettingsManager::getIntSetting( "allowGhosts", 0 ) ) {
+            
+            // player reached old age, and ghosts allowed, keep them around
+            // as a surviving ghost for now
+
+            inPlayer->isGhost = true;
+            
+            newGhostPlayers.push_back( inPlayer->id );
+            
+            
+            newEmotPlayerIDs.push_back( inPlayer->id );
+        
+            newEmotIndices.push_back( ghostEmotionIndex );
+            // ghost emote is permanent
+            newEmotTTLs.push_back( -1 );
+
+
+            return forceDeathAge;
+            }
+
+
+        // else they died of old age, or their surviving ghost was finally
+        // destroyed
+
         age = forceDeathAge;
+        
+        if( inPlayer->isGhost && inPlayer->ghostDestroyed ) {
+            setDeathReason( inPlayer, "exorcism" );
+            }
+        else {
+            setDeathReason( inPlayer, "age" );
+            }
+        
+
+        inPlayer->error = true;
+
 
         // they lived to old age
         // that means they can get born to their descendants in future
@@ -7281,10 +7354,6 @@ static char *getUpdateLineFromRecord(
 
 
 
-static SimpleVector<int> newEmotPlayerIDs;
-static SimpleVector<int> newEmotIndices;
-// 0 if no ttl specified
-static SimpleVector<int> newEmotTTLs;
 
 
 
@@ -9029,7 +9098,10 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
 
     newObject.trueStartTimeSeconds = Time::getCurrentTime();
     newObject.lifeStartTimeSeconds = newObject.trueStartTimeSeconds;
-                            
+    
+    newObject.isGhost = false;
+    newObject.ghostDestroyed = false;
+
 
     newObject.lastSayTimeSeconds = Time::getCurrentTime();
     newObject.firstEmoteTimeSeconds = Time::getCurrentTime();
@@ -9189,10 +9261,10 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                     }
                 
             
-                if( ( inCurseStatus.curseLevel <= 0 && 
+                if( ( newObject.curseStatus.curseLevel <= 0 && 
                       player->curseStatus.curseLevel <= 0 ) 
                     || 
-                    ( inCurseStatus.curseLevel > 0 && 
+                    ( newObject.curseStatus.curseLevel > 0 && 
                       player->curseStatus.curseLevel > 0 ) ) {
                     // cursed babies only born to cursed mothers
                     // non-cursed babies never born to cursed mothers
@@ -9380,8 +9452,8 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
 
 
         // they are going to d-town
-        inCurseStatus.curseLevel = 1;
-        inCurseStatus.excessPoints = 1;
+        newObject.curseStatus.curseLevel = 1;
+        newObject.curseStatus.excessPoints = 1;
         
         // add all existing fertile d-town residents as possible parents
         
@@ -10184,7 +10256,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
         // Eve's curse status
         char seekingCursed = false;
         
-        if( inCurseStatus.curseLevel > 0 ) {
+        if( newObject.curseStatus.curseLevel > 0 ) {
             seekingCursed = true;
             }
         
@@ -10215,7 +10287,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
         char incrementEvePlacement = true;        
 
         // don't increment Eve placement if this is a cursed player
-        if( inCurseStatus.curseLevel > 0 ) {
+        if( newObject.curseStatus.curseLevel > 0 ) {
             incrementEvePlacement = false;
             }
 
@@ -10245,7 +10317,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
             }
         
 
-        if( inCurseStatus.curseLevel > 0 ) {
+        if( newObject.curseStatus.curseLevel > 0 ) {
             // keep cursed players away by sticking them in Donkeytown 
 
             // 200M away in X pushing out away from 0
@@ -10401,6 +10473,8 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
     newObject.nameHasSuffix = false;
     newObject.lastSay = NULL;
     
+    newObject.usedGhostDestroyLongWords = new SimpleVector<char*>();
+
 
     if( newObject.curseStatus.curseLevel == 0 &&
         hasCurseToken( inEmail ) ) {
@@ -12928,6 +13002,77 @@ char *isNamedTrustingSay( char *inSaidString ) {
 
 char isForgiveEveryoneSay( char *inSaidString ) {
     return isWildcardGivingSay( inSaidString, &forgiveEveryonePhrases );
+    }
+
+
+
+char isGhostDestroySay( char *inSaidString ) {
+    char match = isWildcardGivingSay( inSaidString, &ghostDestroyPhrases );
+    
+    if( match ) {
+        return true;
+        }
+    
+    // else does it contain all the right letters?
+
+    SimpleVector<char *> *tokens = tokenizeString( inSaidString );
+
+    if( tokens->size() > 6 ) {
+        // too many words
+        tokens->deallocateStringElements();
+        delete tokens;
+        return false;
+        }
+    
+    SimpleVector<char> allLetters;
+    
+    for( int i=0; i< tokens->size(); i++ ) {
+        char *token = tokens->getElementDirect( i );
+        
+        if( strlen( token ) < 2 ) {
+            // one token too short, min lenght 2
+            tokens->deallocateStringElements();
+            delete tokens;
+            return false;
+            }
+        
+        allLetters.appendElementString( token );    
+        }
+    
+    tokens->deallocateStringElements();
+    delete tokens;
+
+    // 6 or less words of 2 or more letters each
+    
+    if( allLetters.size() != ghostDestroyLetters.size() ) {
+        // wrong number of total letters
+        return false;
+        }
+    
+    // right number of total letters
+    
+    // see if they are all the right letters
+    
+    // remove allLetters one by one as matches found
+    for( int i=0; i < ghostDestroyLetters.size(); i++ ) {
+        
+        int loc = allLetters.getElementIndex( 
+            ghostDestroyLetters.getElementDirect( i ) );
+        
+        if( loc > -1 ) {
+            allLetters.deleteElement( loc );
+            }
+        else {
+            // letter in list not found in allLetters
+            return false;
+            }
+        }
+
+    // if we got here, allLetters should be empty, which 
+    // means we found all individual letters in ghostDestroyLetters in 
+    // allLetters
+    
+    return true;
     }
 
 
@@ -17800,6 +17945,23 @@ int main() {
 
     readPhrases( "cursingPhrases", &cursingPhrases );
 
+    readPhrases( "ghostDestroyPhrases", &ghostDestroyPhrases );
+
+    if( ghostDestroyPhrases.size() > 0 ) {
+        char *firstPhrase = ghostDestroyPhrases.getElementDirect( 0 );
+        SimpleVector<char*> *tokens = tokenizeString( firstPhrase );
+        
+        for( int i=0; i< tokens->size(); i++ ) {
+            char *token = tokens->getElementDirect( i );
+            
+            ghostDestroyLetters.appendElementString( token );
+            }
+        tokens->deallocateStringElements();
+        delete tokens;
+        }
+    
+
+
     readPhrases( "forgivingPhrases", &forgivingPhrases );
     readPhrases( "forgiveYouPhrases", &youForgivingPhrases );
 
@@ -17868,6 +18030,10 @@ int main() {
 
     satisfiedEmotionIndex =
         SettingsManager::getIntSetting( "satisfiedEmotionIndex", 2 );
+
+
+    ghostEmotionIndex =
+        SettingsManager::getIntSetting( "ghostEmotionIndex", 2 );
 
 
     FILE *f = fopen( "curseWordList.txt", "r" );
@@ -22628,6 +22794,77 @@ int main() {
                                     }
                                 }
                             }
+                        
+                        // ghosts can't destroy ghosts
+                        if( ! nextPlayer->isGhost &&
+                            isGhostDestroySay( m.saidText ) ) {
+                            
+                            char alreadyUsed = false;
+                            
+                            SimpleVector<char *> *newWords =
+                                tokenizeString( m.saidText );
+
+                            for( int w=0; w< newWords->size(); w++ ) {
+                                char *word = newWords->getElementDirect( w );
+                                
+                                for( int p=0; 
+                                     p< nextPlayer->
+                                         usedGhostDestroyLongWords->size();
+                                     p++ ) {
+                                
+                                    if( strcmp( 
+                                        word,
+                                        nextPlayer->usedGhostDestroyLongWords->
+                                        getElementDirect( p ) ) == 0 ) {
+                                        
+                                        alreadyUsed = true;
+                                        break;
+                                        }
+                                    }
+                                }
+
+                            if( ! alreadyUsed ) {
+                                // mark long words from this phrase as used
+                                for( int w=0; w< newWords->size(); w++ ) {
+                                    char *word = 
+                                        newWords->getElementDirect( w );
+                                    if( strlen( word ) >= 5 ) {
+                                        
+                                        nextPlayer->usedGhostDestroyLongWords->
+                                            push_back( 
+                                                stringDuplicate( word ) );
+                                        }
+                                    }
+                                
+                                // destroy all ghosts that are roughly on
+                                // screen
+                                GridPos ourPos = getPlayerPos( nextPlayer );
+                                
+                                for( int o=0; o<players.size(); o++ ) {
+                                    LiveObject *otherPlayer = 
+                                        players.getElement( o );
+            
+                                    if( otherPlayer == nextPlayer ||
+                                        otherPlayer->error ||
+                                        ! otherPlayer->isGhost ||
+                                        otherPlayer->ghostDestroyed ) {
+                                        continue;
+                                        }
+
+                                    double dist = 
+                                        distance( ourPos, 
+                                                  getPlayerPos( otherPlayer ) );
+
+                                    if( dist < getMaxChunkDimension() ) {
+                                        otherPlayer->ghostDestroyed = true;
+                                        }
+                                    }
+                                }
+                            
+                            newWords->deallocateStringElements();
+                            delete newWords;
+                            }
+                        
 
                         if( strstr( m.saidText, orderPhrase ) == m.saidText ) {
                             // starts with ORDER phrase
@@ -28403,6 +28640,51 @@ int main() {
 
 
 
+        unsigned char *ghostMessage = NULL;
+        int ghostMessageLength = 0;
+        
+        if( newGhostPlayers.size() > 0 ) {
+            SimpleVector<char> ghostWorking;
+            ghostWorking.appendElementString( "GH\n" );
+            
+            int numAdded = 0;
+            for( int i=0; i<newGhostPlayers.size(); i++ ) {
+                char *line = autoSprintf( 
+                    "%d\n", 
+                    newGhostPlayers.getElementDirect( i ) );
+
+                numAdded++;
+                ghostWorking.appendElementString( line );
+                delete [] line;
+                }
+            
+            ghostWorking.push_back( '#' );
+            
+            if( numAdded > 0 ) {
+
+                char *ghostMessageText = ghostWorking.getElementString();
+                
+                ghostMessageLength = strlen( ghostMessageText );
+                
+                if( ghostMessageLength < maxUncompressedSize ) {
+                    ghostMessage = (unsigned char*)ghostMessageText;
+                    }
+                else {
+                    // compress for all players once here
+                    ghostMessage = makeCompressedMessage( 
+                        ghostMessageText, 
+                        ghostMessageLength, &ghostMessageLength );
+                    
+                    delete [] ghostMessageText;
+                    }
+                }
+            
+            newGhostPlayers.deleteAll();
+            }
+
+
+
+
         unsigned char *emotMessage = NULL;
         int emotMessageLength = 0;
         
@@ -28984,6 +29266,37 @@ int main() {
                     }
                 
                 
+
+                // tell them about all current ghosts
+                SimpleVector<char> ghostMessageWorking;
+                ghostMessageWorking.appendElementString( "GH\n" );
+                for( int i=0; i<numPlayers; i++ ) {
+                
+                    LiveObject *o = players.getElement( i );
+                
+                    if( o->error ) {
+                        continue;
+                        }
+                    if( o->isGhost && ! o->ghostDestroyed ) {
+                    
+                        char *line = autoSprintf( "%d\n", o->id );
+                        
+                        ghostMessageWorking.appendElementString( line );
+                        delete [] line;
+                        }
+                    }
+                ghostMessageWorking.push_back( '#' );
+                
+                char *ghostMessage = ghostMessageWorking.getElementString();
+                
+                sendMessageToPlayer( nextPlayer, ghostMessage, 
+                                     strlen( ghostMessage ) );
+                    
+                delete [] ghostMessage;
+                
+                
+
+
                 // tell them about all permanent emots
                 SimpleVector<char> emotMessageWorking;
                 emotMessageWorking.appendElementString( "PE\n" );
@@ -29525,6 +29838,25 @@ int main() {
                                                "Socket write failed" );
                         }
                     }
+
+
+
+                // EVERYONE gets info about new ghost players           
+                if( ghostMessage != NULL && nextPlayer->connected ) {
+                    int numSent = 
+                        nextPlayer->sock->send( 
+                            ghostMessage, 
+                            ghostMessageLength, 
+                            false, false );
+                    
+                    nextPlayer->gotPartOfThisFrame = true;
+                    
+                    if( numSent != ghostMessageLength ) {
+                        setPlayerDisconnected( nextPlayer, 
+                                               "Socket write failed" );
+                        }
+                    }
+
 
 
                 // EVERYONE gets info about emots           
@@ -30631,6 +30963,9 @@ int main() {
         if( healingMessage != NULL ) {
             delete [] healingMessage;
             }
+        if( ghostMessage != NULL ) {
+            delete [] ghostMessage;
+            }
         if( emotMessage != NULL ) {
             delete [] emotMessage;
             }
@@ -30741,6 +31076,11 @@ int main() {
                     delete [] nextPlayer->lastSay;
                     }
                 
+                nextPlayer->usedGhostDestroyLongWords->
+                    deallocateStringElements();
+                delete nextPlayer->usedGhostDestroyLongWords;
+
+
                 freePlayerContainedArrays( nextPlayer );
                 
                 if( nextPlayer->pathToDest != NULL ) {
@@ -30839,6 +31179,11 @@ void setDrawColor( float inR, float inG, float inB, float inA ) {
 void setDrawColor( FloatColor inColor ) {
     }
 
+FloatColor getDrawColor() {
+    FloatColor c = { 1, 1, 1, 1 };
+    return c;
+    }
+
 void setDrawFade( float ) {
     }
 
@@ -30852,7 +31197,13 @@ void toggleAdditiveTextureColoring( char inAdditive ) {
 void toggleAdditiveBlend( char ) {
     }
 
+void toggleInvertedBlend( char ) {
+    }
+
 void drawSquare( doublePair, double ) {
+    }
+
+void drawRect( doublePair, double, double ) {
     }
 
 void startAddingToStencil( char, char, float ) {
