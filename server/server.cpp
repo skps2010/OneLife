@@ -18621,19 +18621,21 @@ int main() {
                     }
                 }
             
-            // look at old age death to
-            double ageLeft = forceDeathAge - computeAge( nextPlayer );
-            
-            double ageSecondsLeft = ageLeft * secPerYear;
-            
-            if( ageSecondsLeft < minMoveTime ) {
-                minMoveTime = ageSecondsLeft;
 
-                if( minMoveTime < 0 ) {
-                    minMoveTime = 0;
+            if( ! nextPlayer->isGhost ) {
+                // look at old age death too
+                double ageLeft = forceDeathAge - computeAge( nextPlayer );
+                
+                double ageSecondsLeft = ageLeft * secPerYear;
+                
+                if( ageSecondsLeft < minMoveTime ) {
+                    minMoveTime = ageSecondsLeft;
+                    
+                    if( minMoveTime < 0 ) {
+                        minMoveTime = 0;
+                        }
                     }
                 }
-            
 
             // as low as it can get, no need to check other players
             if( minMoveTime == 0 ) {
@@ -28679,6 +28681,9 @@ int main() {
                     }
                 }
             
+            // we clear this now, right after composing the GH message
+            // since various actions below may create more ghosts
+            // and we'll add those to the GH message next time.
             newGhostPlayers.deleteAll();
             }
 
@@ -28747,6 +28752,15 @@ int main() {
                     delete [] emotMessageText;
                     }
                 }
+
+
+            // we have to clear the emotes list NOW, right after composing
+            // this message.  If we wait until later, various actions, below
+            // may add new emotes to the list.  We need to save them for next
+            //  time, when we compose the next PE message
+            newEmotPlayerIDs.deleteAll();
+            newEmotIndices.deleteAll();
+            newEmotTTLs.deleteAll();
             }
 
         
@@ -28817,9 +28831,9 @@ int main() {
         SimpleVector<int> playersReceivingPlayerUpdate;
         
 
-        for( int i=0; i<numLive; i++ ) {
+        for( int p=0; p<numLive; p++ ) {
             
-            LiveObject *nextPlayer = players.getElement(i);
+            LiveObject *nextPlayer = players.getElement(p);
             
             
             // everyone gets all flight messages
@@ -30990,9 +31004,6 @@ int main() {
         newGraveMoves.deleteAll();
         
         
-        newEmotPlayerIDs.deleteAll();
-        newEmotIndices.deleteAll();
-        newEmotTTLs.deleteAll();
         
         newOwnerPos.deleteAll();
 
