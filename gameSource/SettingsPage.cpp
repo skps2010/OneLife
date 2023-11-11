@@ -59,7 +59,7 @@ SettingsPage::SettingsPage()
           mCursorScaleSlider( mainFont, 297, 155, 4, 200, 30,
                                        1.0, 10.0, 
                                        translate( "scale" ) ),
-          mTranslateButton( mainFont, -400, -40, 
+          mTranslateButton( mainFont, -542, 268, 
                            translate( "translateButton" ) ) {
                             
 
