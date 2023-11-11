@@ -15,6 +15,9 @@
 #include "objectBank.h"
 #include "buttonStyle.h"
 
+#include <sys/stat.h>
+#include <unistd.h>
+#include "message.h" //To show tips
 
 extern Font *mainFont;
 
@@ -55,7 +58,9 @@ SettingsPage::SettingsPage()
           mPasteButton( mainFont, 518, -216, translate( "paste" ) ),
           mCursorScaleSlider( mainFont, 297, 155, 4, 200, 30,
                                        1.0, 10.0, 
-                                       translate( "scale" ) ) {
+                                       translate( "scale" ) ),
+          mTranslateButton( mainFont, -400, -40, 
+                           translate( "translateButton" ) ) {
                             
 
     
@@ -82,6 +87,7 @@ SettingsPage::SettingsPage()
     setButtonStyle( &mRedetectButton );
     setButtonStyle( &mCopyButton );
     setButtonStyle( &mPasteButton );
+    setButtonStyle( &mTranslateButton );
 
     addComponent( &mBackButton );
     mBackButton.addActionListener( this );
@@ -115,10 +121,14 @@ SettingsPage::SettingsPage()
     
     addComponent( &mCopyButton );
     addComponent( &mPasteButton );
+
+    addComponent( &mTranslateButton );
     
     mCopyButton.addActionListener( this );
     mPasteButton.addActionListener( this );
     
+    mTranslateButton.addActionListener( this );
+
     if( ! isClipboardSupported() ) {
         mCopyButton.setVisible( false );
         mPasteButton.setVisible( false );
@@ -160,6 +170,8 @@ SettingsPage::SettingsPage()
     if( getCountingOnVsync() ) {
         mTargetFrameRateField.setVisible( false );
         }
+
+    mTranslateButton.setMouseOverTip( translate( "translateTip" ) );
     }
 
 
@@ -464,6 +476,55 @@ void SettingsPage::actionPerformed( GUIComponent *inTarget ) {
         }
     
     
+        else if( inTarget == &mTranslateButton ) {
+        struct stat buffer;
+
+#ifdef __mac__
+        if(stat ("translator", &buffer) == 0) {
+            system("open translator; sleep 1.0; while pgrep -f translator >/dev/null; do sleep 1.0; done");
+        }
+        else
+            system("open translator.py -a Terminal; sleep 1.0; while pgrep -f translator >/dev/null; do sleep 1.0; done");
+
+#elif defined(WIN32)
+        char fullscreen = SettingsManager::getIntSetting("fullscreen", 0);
+        if(fullscreen) {
+            char cwd[PATH_MAX];
+            getcwd(cwd, sizeof(cwd));
+            char *call;
+
+            if(stat ("translator.exe", &buffer) == 0) {
+                call = autoSprintf("wmic process call create 'cmd /c start translator.exe', '%s'", cwd ); 
+            }
+            else
+                call = autoSprintf("wmic process call create 'cmd /c python3 translator.py', '%s'", cwd );    
+            system( call );
+            delete [] call;
+            exit(0);
+        }
+        else {
+            if(stat ("translator.exe", &buffer) == 0) {
+                system("translator.exe");
+            }
+            else
+                system("python3 translator.py");
+        }
+
+#else
+        system("x-terminal-emulator -e python3 translator.py");
+#endif
+
+        char relaunched = relaunchGame();
+
+        if( !relaunched ) {
+            printf( "Relaunch failed\n" );
+            setSignal( "relaunchFailed" );
+            }
+        else {
+            printf( "Relaunched... but did not exit?\n" );
+            setSignal( "relaunchFailed" );
+            }
+        }
     }
 
 
