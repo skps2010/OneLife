@@ -9137,6 +9137,14 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
     int numBirthLocationsSidsBlocked = 0;
     
 
+    // on low-pop servers, don't cycle a player through to D-town if they
+    // SIDS repeatedly.
+    // Let them eventually run out of moms and become a new Eve
+    int dieCycleDonkeytownThreshold = 
+        SettingsManager::getIntSetting( "dieCycleDonkeytownThreshold", 8 );
+    
+
+
     int numOfAge = 0;
 
     int maxLivingChildrenPerMother = 
@@ -9454,7 +9462,8 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
         }
     else if( parentChoices.size() == 0 &&
              ( numBirthLocationsCurseBlocked > 0 ||
-               numBirthLocationsSidsBlocked > 0 ) ) {
+               ( numBirthLocationsSidsBlocked > 0 &&
+                 numPlayers >= dieCycleDonkeytownThreshold ) ) ) {
 
         // they are blocked from being born EVERYWHERE by curses
         // OR by their own SIDS choices
@@ -9635,7 +9644,8 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
 
     if( parentChoices.size() == 0 && 
         ( numBirthLocationsCurseBlocked > 0 || 
-          numBirthLocationsSidsBlocked > 0 ) ) {
+          ( numBirthLocationsSidsBlocked > 0
+            && numPlayers >= dieCycleDonkeytownThreshold ) ) ) {
         AppLog::infoF( "No available mothers in d-town, "
                        "sending a new Eve to donkeytown" );
         }
@@ -10064,11 +10074,21 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                 // females
                 // If so, force a girl baby.
                 // Do this regardless of whether Eve window is in effect, etc.
+
+                // Also, if the family has 0 girl children, force a girl
+                // too.  This covers the case where all the fertile women
+                // are right at the tail end of their fertility.
+                // We actually want to measure the "fertile future"
+                // here.
+                // (Players have been /DIE cycling to force a girl baby
+                //  in situations that the server fails to compensate for).
+                
                 int min = SettingsManager::getIntSetting( 
                     "minPotentialFertileFemalesPerFamily", 3 );
                 int famMothers = countFertileMothers( parent->lineageEveID );
                 int famGirls = countGirls( parent->lineageEveID );
-                if( famMothers + famGirls < min ) {
+                if( famMothers + famGirls < min ||
+                    famGirls == 0 ) {
                     forceGirl = true;
                     }
                 }
@@ -24284,7 +24304,8 @@ int main() {
                                         bonus = 0;
                                         }
                                     
-                                    logEating( targetObj->id,
+                                    logEating( nextPlayer->id,
+                                               targetObj->id,
                                                targetObj->foodValue + bonus,
                                                computeAge( nextPlayer ),
                                                m.x, m.y );
@@ -25295,7 +25316,8 @@ int main() {
                                         bonus = 0;
                                         }
 
-                                    logEating( obj->id,
+                                    logEating( targetPlayer->id, 
+                                               obj->id,
                                                obj->foodValue + bonus,
                                                targetPlayerAge,
                                                m.x, m.y );
