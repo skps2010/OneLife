@@ -1160,8 +1160,8 @@ typedef struct LiveObject {
         
         SimpleVector<int> permanentEmots;
 
-        // email of last baby that we had that did /DIE
-        char *lastSidsBabyEmail;
+        // emails of babies we had that did /DIE
+        SimpleVector<char *> sidsBabyEmails;
         
         char everHomesick;
         
@@ -2387,9 +2387,8 @@ void quitCleanup() {
         if( nextPlayer->lastBabyEmail != NULL  ) {
             delete [] nextPlayer->lastBabyEmail;
             }
-        if( nextPlayer->lastSidsBabyEmail != NULL ) {
-            delete [] nextPlayer->lastSidsBabyEmail;
-            }
+
+        nextPlayer->sidsBabyEmails.deallocateStringElements();
 
         if( nextPlayer->murderPerpEmail != NULL  ) {
             delete [] nextPlayer->murderPerpEmail;
@@ -8991,7 +8990,6 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
     newObject.email = inEmail;
     newObject.origEmail = NULL;
     
-    newObject.lastSidsBabyEmail = NULL;
 
     newObject.lastBabyEmail = NULL;
 
@@ -9135,6 +9133,17 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
     SimpleVector<LiveObject*> parentChoices;
     
     int numBirthLocationsCurseBlocked = 0;
+    
+    int numBirthLocationsSidsBlocked = 0;
+    
+
+    // on low-pop servers, don't cycle a player through to D-town if they
+    // SIDS repeatedly.
+    // Let them eventually run out of moms and become a new Eve
+    int dieCycleDonkeytownThreshold = 
+        SettingsManager::getIntSetting( "dieCycleDonkeytownThreshold", 8 );
+    
+
 
     int numOfAge = 0;
 
@@ -9183,12 +9192,12 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                 }
                 
             
-            if( player->lastSidsBabyEmail != NULL &&
-                strcmp( player->lastSidsBabyEmail,
-                        newObject.email ) == 0 ) {
-                // this baby JUST committed SIDS for this mother
+            if( player->sidsBabyEmails.
+                getMatchingStringIndex( newObject.email ) != -1 ) {
+                // this baby committed SIDS for this mother
                 // skip her
-                // (don't ever send SIDS baby to same mother twice in a row)
+                // (don't ever send SIDS baby to same mother twice)
+                numBirthLocationsSidsBlocked ++;
                 continue;
                 }
 
@@ -9290,11 +9299,13 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
             
             AppLog::infoF( 
                 "Trying to place new baby %s, out of %d fertile moms, "
-                "all are on cooldown, lineage banned, or curse blocked.  "
+                "all are on cooldown, lineage banned, curse blocked, or "
+                "SIDS blocked.  "
                 "Trying again ignoring cooldowns.", newObject.email, numOfAge );
             
             checkCooldown = false;
             numBirthLocationsCurseBlocked = 0;
+            numBirthLocationsSidsBlocked = 0;
             numOfAge = 0;
             }
         else if( p == 1 ) {
@@ -9305,12 +9316,14 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
             
                 AppLog::infoF( 
                     "Trying to place new baby %s, out of %d fertile moms, "
-                    "none are not on lineage limit or curse blocked.  "
+                    "none are not on lineage limit, curse blocked, or "
+                    "SIDS blocked.  "
                     "Trying again ignoring lineage limit.", 
                     newObject.email, numOfAge );
                 
                 checkLineageLimit = false;
                 numBirthLocationsCurseBlocked = 0;
+                numBirthLocationsSidsBlocked = 0;
                 numOfAge = 0;
                 }
             }
@@ -9353,9 +9366,10 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                         "%d babies for %d adults, forcing Eve.",
                         totalBabies, totalAdults );
                     
-                    // this player wasn't cursed out of all
+                    // this player wasn't cursed out (or SIDS'd out) of all
                     // possible birth locations
                     numBirthLocationsCurseBlocked = 0;
+                    numBirthLocationsSidsBlocked = 0;
                     parentChoices.deleteAll();
                     }
                 else {
@@ -9379,9 +9393,10 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                             "%d babies for %d moms, forcing Eve.",
                             totalBabies, totalMoms );
                     
-                        // this player wasn't cursed out of all
+                        // this player wasn't cursed out (or SIDS'd out) of all
                         // possible birth locations
                         numBirthLocationsCurseBlocked = 0;
+                        numBirthLocationsSidsBlocked = 0;
                         parentChoices.deleteAll();
                         }
                     }
@@ -9430,6 +9445,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
             
             // don't send ourselves to d-town in this case
             numBirthLocationsCurseBlocked = 0;
+            numBirthLocationsSidsBlocked = 0;
             }
         }
     else if( parentChoices.size() == 0 && 
@@ -9438,19 +9454,60 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
         // there's only one mom on the server, and we're curse-blocked from her
         // don't send us to d-town in this case
         numBirthLocationsCurseBlocked = 0;
+        numBirthLocationsSidsBlocked = 0;
         
         AppLog::info( 
                 "Only fertile mom on server has us curse-blocked.  "
                 "Avoiding her, and not going to d-town, spawning new Eve" );   
         }
     else if( parentChoices.size() == 0 &&
-             numBirthLocationsCurseBlocked > 0 ) {
+             ( numBirthLocationsCurseBlocked > 0 ||
+               ( numBirthLocationsSidsBlocked > 0 &&
+                 numPlayers >= dieCycleDonkeytownThreshold ) ) ) {
 
         // they are blocked from being born EVERYWHERE by curses
-
+        // OR by their own SIDS choices
+        
         AppLog::infoF( "No available mothers, and %d are curse blocked, "
+                       "and %d are SIDS blocked, "
                        "looking for a d-town mother",
-                       numBirthLocationsCurseBlocked );
+                       numBirthLocationsCurseBlocked,
+                       numBirthLocationsSidsBlocked );
+        
+
+        if( numBirthLocationsSidsBlocked > 0 ) {
+            // visiting d-town might be temporary in this case
+
+            // clear this player from all SIDS-block lists
+            // let them start over, and loop through mothers again,
+            // after their trip to d-town
+            
+            for( int i=0; i<numPlayers; i++ ) {
+                LiveObject *player = players.getElement( i );
+            
+                if( player->error ) {
+                    continue;
+                    }
+                
+                if( player->isTutorial ) {
+                    continue;
+                    }
+                
+                if( player->vogMode ) {
+                    continue;
+                    }
+            
+                int foundIndex =
+                    player->sidsBabyEmails.
+                    getMatchingStringIndex( newObject.email );
+                
+                if( foundIndex != -1 ) {                    
+                    player->sidsBabyEmails.deallocateStringElement( 
+                        foundIndex );
+                    }
+                }
+            }
+        
 
 
         // they are going to d-town
@@ -9585,7 +9642,10 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
 
 
 
-    if( parentChoices.size() == 0 && numBirthLocationsCurseBlocked > 0 ) {
+    if( parentChoices.size() == 0 && 
+        ( numBirthLocationsCurseBlocked > 0 || 
+          ( numBirthLocationsSidsBlocked > 0
+            && numPlayers >= dieCycleDonkeytownThreshold ) ) ) {
         AppLog::infoF( "No available mothers in d-town, "
                        "sending a new Eve to donkeytown" );
         }
@@ -10014,11 +10074,21 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                 // females
                 // If so, force a girl baby.
                 // Do this regardless of whether Eve window is in effect, etc.
+
+                // Also, if the family has 0 girl children, force a girl
+                // too.  This covers the case where all the fertile women
+                // are right at the tail end of their fertility.
+                // We actually want to measure the "fertile future"
+                // here.
+                // (Players have been /DIE cycling to force a girl baby
+                //  in situations that the server fails to compensate for).
+                
                 int min = SettingsManager::getIntSetting( 
                     "minPotentialFertileFemalesPerFamily", 3 );
                 int famMothers = countFertileMothers( parent->lineageEveID );
                 int famGirls = countGirls( parent->lineageEveID );
-                if( famMothers + famGirls < min ) {
+                if( famMothers + famGirls < min ||
+                    famGirls == 0 ) {
                     forceGirl = true;
                     }
                 }
@@ -20404,30 +20474,11 @@ int main() {
                             parentO->birthCoolDown = 0;
                             }
 
-                        if( parentO != NULL &&
-                            parentO->lastSidsBabyEmail != NULL ) {
-                            delete [] parentO->lastSidsBabyEmail;
-                            parentO->lastSidsBabyEmail = NULL;
-                            }
                         
-                        // walk through all other players and clear THIS
-                        // player from their SIDS mememory
-                        // we only track the most recent parent who had this
-                        // baby SIDS
-                        for( int p=0; p<players.size(); p++ ) {
-                            LiveObject *parent = players.getElement( p );
-                            
-                            if( parent->lastSidsBabyEmail != NULL &&
-                                strcmp( parent->lastSidsBabyEmail,
-                                        nextPlayer->email ) == 0 ) {
-                                delete [] parent->lastSidsBabyEmail;
-                                parent->lastSidsBabyEmail = NULL;
-                                }
-                            }
-                        
+                        // add this baby's email to this mother's SIDS list
                         if( parentO != NULL ) {
-                            parentO->lastSidsBabyEmail = 
-                                stringDuplicate( nextPlayer->email );
+                            parentO->sidsBabyEmails.push_back( 
+                                stringDuplicate( nextPlayer->email ) );
                             }
                         
                         int holdingAdultID = nextPlayer->heldByOtherID;
@@ -24253,7 +24304,8 @@ int main() {
                                         bonus = 0;
                                         }
                                     
-                                    logEating( targetObj->id,
+                                    logEating( nextPlayer->id,
+                                               targetObj->id,
                                                targetObj->foodValue + bonus,
                                                computeAge( nextPlayer ),
                                                m.x, m.y );
@@ -25264,7 +25316,8 @@ int main() {
                                         bonus = 0;
                                         }
 
-                                    logEating( obj->id,
+                                    logEating( targetPlayer->id, 
+                                               obj->id,
                                                obj->foodValue + bonus,
                                                targetPlayerAge,
                                                m.x, m.y );
@@ -31109,10 +31162,9 @@ int main() {
                 if( nextPlayer->lastBabyEmail != NULL ) {
                     delete [] nextPlayer->lastBabyEmail;
                     }
-                if( nextPlayer->lastSidsBabyEmail != NULL ) {
-                    delete [] nextPlayer->lastSidsBabyEmail;
-                    }
 
+                nextPlayer->sidsBabyEmails.deallocateStringElements();
+                
                 if( nextPlayer->murderPerpEmail != NULL ) {
                     delete [] nextPlayer->murderPerpEmail;
                     }

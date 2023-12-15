@@ -61,6 +61,7 @@ spellCheck.cpp \
 SoundUsage.cpp \
 objectMetadata.cpp \
 emotion.cpp \
+exporter.cpp \
 
 
 
@@ -140,4 +141,5 @@ NEEDED_MINOR_GEMS_OBJECTS = \
  ${DIFF_BUNDLE_CLIENT_O} \
  ${STRING_TREE_O} \
  ${BINARY_SEMAPHORE_O} \
+ ${CRC32_O} \
 
