@@ -10,9 +10,16 @@ jobs:
       - name: check version mismatch
         id: mismatch
         run: |
-          jason=`curl --silent https://raw.githubusercontent.com/jasonrohrer/OneLifeData7/master/dataVersionNumber.txt`
-          mine_with_v=`curl --silent https://api.github.com/repos/skps2010/OneLife/releases/latest | jq -r .tag_name | grep -o -P 'v\d*'`
-          is_mismatch=$([ v"$jason" = $mine_with_v ] && echo "false" || echo "true")
+          jason=`curl --silent https://raw.githubusercontent.com/jasonrohrer/OneLife/master/gameSource/game.cpp`
+          jason=`echo $jason | grep -o -P '(?<=int versionNumber = )[0-9]+'`
+          jason2=`curl --silent https://raw.githubusercontent.com/jasonrohrer/OneLifeData7/master/dataVersionNumber.txt`
+          if [ "$jason2" -gt "$jason" ]
+          then
+            jason=$jason2
+          fi
+
+          mine=`curl --silent https://api.github.com/repos/skps2010/OneLife/releases/latest | jq -r .tag_name | grep -o -P '(?<=v)\d*'`
+          is_mismatch=$([ $jason = $mine ] && echo "false" || echo "true")
           echo is_mismatch=$is_mismatch >> "$GITHUB_OUTPUT"
           echo version=$jason >> "$GITHUB_OUTPUT"
           echo is_mismatch: $is_mismatch, version: $jason
