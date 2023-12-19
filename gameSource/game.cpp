@@ -1,4 +1,4 @@
-int versionNumber = 399;
+int versionNumber = 405;
 int dataVersionNumber = 0;
 
 int binVersionNumber = versionNumber;
@@ -73,6 +73,7 @@ CustomRandomSource randSource( 34957197 );
 #include "spriteBank.h"
 #include "objectBank.h"
 #include "categoryBank.h"
+#include "importer.h"
 #include "transitionBank.h"
 #include "soundBank.h"
 
@@ -667,9 +668,9 @@ void initFrameDrawer( int inWidth, int inHeight, int inTargetFrameRate,
     
     char rebuilding;
     
-    // game doesn't need to compute sprite hashes
+    // game needs to compute hashes for mod loading
     int numSprites = 
-        initSpriteBankStart( &rebuilding, false );
+        initSpriteBankStart( &rebuilding, true );
                         
     if( rebuilding ) {
         loadingPage->setCurrentPhase( translate( "spritesRebuild" ) );
@@ -1436,7 +1437,9 @@ void drawFrame( char inUpdate ) {
       
                         char rebuilding;
 
-                        int numSounds = initSoundBankStart( &rebuilding );
+                        // compute hashes for mod loading
+                        int numSounds = initSoundBankStart( &rebuilding,
+                                                            true );
 
                         if( rebuilding ) {
                             loadingPage->setCurrentPhase( 
@@ -1552,6 +1555,40 @@ void drawFrame( char inUpdate ) {
                                 loadingPhaseStartTime );
                         loadingPhaseStartTime = Time::getCurrentTime();
 
+                        int numModBlocks = initModLoaderStart();
+                        
+                        loadingPage->setCurrentPhase( translate( "mods" ) );
+                        loadingPage->setCurrentProgress( 0 );
+                        
+
+                        loadingStepBatchSize = numModBlocks / numLoadingSteps;
+                        
+                        if( loadingStepBatchSize < 1 ) {
+                            loadingStepBatchSize = 1;
+                            }
+
+                        loadingPhase ++;
+                        }
+                    break;
+                    }
+                case 4: {
+                    float progress;
+                    for( int i=0; i<loadingStepBatchSize; i++ ) {    
+                        progress = initModLoaderStep();
+                        loadingPage->setCurrentProgress( progress );
+                        }
+                    
+                    if( progress == 1.0 ) {
+                        initModLoaderFinish();
+                        
+                        // mods load sounds which may need reverbs applied
+                        doneApplyingReverb();
+                        
+                        printf( "Finished loading mods in %f sec\n",
+                                Time::getCurrentTime() - 
+                                loadingPhaseStartTime );
+                        loadingPhaseStartTime = Time::getCurrentTime();
+
                         char rebuilding;
                         
                         int numCats = 
@@ -1578,7 +1615,7 @@ void drawFrame( char inUpdate ) {
                         }
                     break;
                     }
-                case 4: {
+                case 5: {
                     float progress;
                     for( int i=0; i<loadingStepBatchSize; i++ ) {    
                         progress = initCategoryBankStep();
@@ -1621,7 +1658,7 @@ void drawFrame( char inUpdate ) {
                         }
                     break;
                     }
-                case 5: {
+                case 6: {
                     float progress;
                     for( int i=0; i<loadingStepBatchSize; i++ ) {    
                         progress = initTransBankStep();
@@ -1650,7 +1687,7 @@ void drawFrame( char inUpdate ) {
                         }
                     break;
                     }
-                case 6: {
+                case 7: {
                     float progress;
                     for( int i=0; i<loadingStepBatchSize; i++ ) {    
                         progress = initGroundSpritesStep();

@@ -1,4 +1,4 @@
-int versionNumber = 60;
+int versionNumber = 405;
 
 
 
@@ -62,6 +62,7 @@ int accountHmacVersionNumber = 0;
 #include "EditorAnimationPage.h"
 #include "EditorCategoryPage.h"
 #include "EditorScenePage.h"
+#include "EditorExportPage.h"
 
 #include "LoadingPage.h"
 
@@ -69,6 +70,8 @@ int accountHmacVersionNumber = 0;
 #include "objectBank.h"
 #include "overlayBank.h"
 #include "soundBank.h"
+
+#include "importer.h"
 
 #include "SoundWidget.h"
 
@@ -101,6 +104,7 @@ EditorTransitionPage *transPage;
 EditorAnimationPage *animPage;
 EditorCategoryPage *categoryPage;
 EditorScenePage *scenePage;
+EditorExportPage *exportPage;
 
 LoadingPage *loadingPage;
 
@@ -126,7 +130,8 @@ doublePair lastScreenViewCenter = {0, 0 };
 
 
 // world with of one view
-double viewWidth = 1024;
+double viewWidth = 1280;
+double viewHeight = 720;
 
 // fraction of viewWidth visible vertically (aspect ratio)
 double viewHeightFraction;
@@ -172,8 +177,8 @@ char doesOverrideGameImageSize() {
 
 
 void getGameImageSize( int *outWidth, int *outHeight ) {
-    *outWidth = 1024;
-    *outHeight = 600;
+    *outWidth = viewWidth;
+    *outHeight = viewHeight;
     }
 
 
@@ -235,6 +240,8 @@ char gamePlayingBack = false;
 
 Font *mainFont;
 Font *smallFont;
+Font *smallFontFixed;
+
 Font *mainFontFixed;
 Font *numbersFontFixed;
 
@@ -429,7 +436,11 @@ void initFrameDrawer( int inWidth, int inHeight, int inTargetFrameRate,
     
     
     smallFont = new Font( getFontTGAFileName(), 3, 8, false, 8 );
+    smallFontFixed = new Font( getFontTGAFileName(), 3, 8, true, 8, 16 );
     
+    smallFont->setMinimumPositionPrecision( 1 );
+    smallFontFixed->setMinimumPositionPrecision( 1 );
+
     mainFontFixed = new Font( getFontTGAFileName(), 6, 16, true, 16 );
     numbersFontFixed = new Font( getFontTGAFileName(), 6, 16, true, 16, 16 );
     
@@ -506,6 +517,8 @@ void initFrameDrawer( int inWidth, int inHeight, int inTargetFrameRate,
     animPage = new EditorAnimationPage;
     categoryPage = new EditorCategoryPage;
     scenePage = new EditorScenePage;
+    exportPage = new EditorExportPage;
+    
     loadingPage = new LoadingPage;
     
     loadingPage->setCurrentPhase( "OVERLAYS" );
@@ -527,6 +540,7 @@ void initFrameDrawer( int inWidth, int inHeight, int inTargetFrameRate,
 
 void freeFrameDrawer() {
     delete smallFont;
+    delete smallFontFixed;
     delete mainFontFixed;
     delete numbersFontFixed;
     
@@ -560,6 +574,8 @@ void freeFrameDrawer() {
     delete animPage;
     delete categoryPage;
     delete scenePage;
+    delete exportPage;
+    
     delete loadingPage;
 
 
@@ -1238,6 +1254,40 @@ void drawFrame( char inUpdate ) {
                         
                         loadingPhaseStartTime = Time::getCurrentTime();
 
+                        int numBlocks = initModLoaderStart();
+                        loadingPage->setCurrentPhase( "MODS" );
+                        loadingPage->setCurrentProgress( 0 );
+                        
+
+                        loadingStepBatchSize = numBlocks / 20;
+                        
+                        if( loadingStepBatchSize < 1 ) {
+                            loadingStepBatchSize = 1;
+                            }
+
+                        loadingPhase ++;
+                        }
+                    break;
+                    }
+                case 5: {
+                    float progress;
+                    for( int i=0; i<loadingStepBatchSize; i++ ) {    
+                        progress = initModLoaderStep();
+                        loadingPage->setCurrentProgress( progress );
+                        }
+                    
+                    if( progress == 1.0 ) {
+                        initModLoaderFinish();
+                        
+                        // mods load sounds which may need reverbs applied
+                        doneApplyingReverb();
+                        
+                        printf( "Finished loading mods in %f sec\n",
+                                Time::getCurrentTime() - 
+                                loadingPhaseStartTime );
+                        
+                        loadingPhaseStartTime = Time::getCurrentTime();
+
                         char rebuilding;
                         
                         int numCats = 
@@ -1263,7 +1313,7 @@ void drawFrame( char inUpdate ) {
                         }
                     break;
                     }
-                case 5: {
+                case 6: {
                     float progress;
                     for( int i=0; i<loadingStepBatchSize; i++ ) {    
                         progress = initCategoryBankStep();
@@ -1307,7 +1357,7 @@ void drawFrame( char inUpdate ) {
                         }
                     break;
                     }
-                case 6: {
+                case 7: {
                     float progress;
                     for( int i=0; i<loadingStepBatchSize; i++ ) {    
                         progress = initTransBankStep();
@@ -1330,7 +1380,7 @@ void drawFrame( char inUpdate ) {
                         }
                     break;
                     }
-                case 7: {
+                case 8: {
                     float progress;
                     for( int i=0; i<loadingStepBatchSize; i++ ) {    
                         progress = initGroundSpritesStep();
@@ -1348,10 +1398,6 @@ void drawFrame( char inUpdate ) {
                     //printOrphanedSoundReport();
                     initEmotion();
                     
-                    // try exporting person
-                    exportObject( 19 );
-                    
-
                     currentGamePage = importPage;
                     loadingComplete();
                     currentGamePage->base_makeActive( true );
@@ -1387,6 +1433,10 @@ void drawFrame( char inUpdate ) {
                 animPage->clearClothing();
                 currentGamePage->base_makeActive( true );
                 }
+            else if( objectPage->checkSignal( "exportEditor" ) ) {
+                currentGamePage = exportPage;
+                currentGamePage->base_makeActive( true );
+                }
             }
         else if( currentGamePage == transPage ) {
             if( transPage->checkSignal( "objectEditor" ) ) {
@@ -1417,6 +1467,12 @@ void drawFrame( char inUpdate ) {
         else if( currentGamePage == scenePage ) {
             if( scenePage->checkSignal( "animEditor" ) ) {
                 currentGamePage = animPage;
+                currentGamePage->base_makeActive( true );
+                }
+            }
+        else if( currentGamePage == exportPage ) {
+            if( exportPage->checkSignal( "objectEditor" ) ) {
+                currentGamePage = objectPage;
                 currentGamePage->base_makeActive( true );
                 }
             }

@@ -162,8 +162,20 @@ typedef struct LayerSwapRecord {
 AnimationRecord *copyRecord( AnimationRecord *inRecord, 
                              char inCountLiveSoundUses = true );
 
-// should only be called on results of copyRecord and NOT
-// on results of getAnimation
+
+
+// scans an AnimationRecord from a string
+// has no side-effects on animationBank internal state
+//
+// Returned AnimationRecord must be freed by caller.
+// Can return NULL if parsing fails.
+AnimationRecord *scanAnimationRecordFromString( const char *inString );
+
+
+
+
+// should only be called on results of copyRecord or 
+// scanAnimationRecordFromString NOT on results of getAnimation
 void freeRecord( AnimationRecord *inRecord );
 
 
@@ -198,6 +210,11 @@ void setExtraIndexB( int inIndex );
 
 int getNumExtraAnim( int inID );
 
+// returned array destroyed by caller
+// animation records NOT destroyed by caller
+// can return NULL
+AnimationRecord **getAllExtraAnimations( int inID );
+
 
 // return value not destroyed by caller
 // should not be modifed by caller
@@ -212,7 +229,9 @@ AnimationRecord *getAnimation( int inID, AnimType inType );
 void addAnimation( AnimationRecord *inRecord, char inNoWriteToFile = false );
 
 
-void clearAnimation( int inObjectID, AnimType inType );
+// if inNoWriteToFile is true, doesn't delete animation from disk
+void clearAnimation( int inObjectID, AnimType inType, 
+                     char inNoWriteToFile = false );
 
 
 // do we need a smooth fade when transitionion from current animation

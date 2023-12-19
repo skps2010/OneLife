@@ -4,10 +4,40 @@ http://onehouronelife.com/updateLog.php
 
 
 
-Version ???
+Version 405   2023-December-15
+
+--Fixed fprintf type warning found with old Mac compiler.
+
+--Added missing DLLs for editor on Windows.
+
+
+
+
+Version 404   2023-December-15
 
 --Fixed so that BELL and HELL arrow labels are in English.txt translation file
   instead of hard-coded.
+
+--Fixed loads of places in both client and server that would cause a crash if
+  content data set wasn't sufficiently fleshed out (at least one person object,
+  at least one natural object, at least one food object, etc.).  Now both
+  client and server are stable regardless of state of content set.
+
+--Fixed memory leak when objects folder contains object .txt files with
+  duplicate IDs.  Previously they were overwritten in the id map without
+  freeing the previous object.  Now, only the first object scanned is kept,
+  and any additional ones are freed correctly.
+
+--Game now supports loading mods from mods folder.
+
+--Windows build scripts now include building editor.
+
+--Public release of EditOneLife binary on Windows and Steam.
+
+
+
+
+Editor Fixes:
 
 --Fixed soundBank to roll back nextSoundNumber value whenever last sound in
   bank is deleted, to avoid sound id inflation.
@@ -16,6 +46,39 @@ Version ???
   when recording over a sound.  This further reduces sound id inflation.  Now,
   if you record a bunch of sounds, with multiple overwriting takes for each
   one, and then delete them all, the nextSoundNumber won't increase at all.
+
+--Key legends now have dark backgrounds behind them so they are more legible
+  when large objects underhang them.
+
+--Gigantic speed up (over 10x) of Editor load time when running with
+  LeakTracer.  Allocating a 400x90 scene to init the SceneEditor was too slow,
+  given all the deep copying of SimpleVectors for each cell.  Scene Editor now
+  detects LeakTracer and allocates a smaller scene.
+
+--Fixed a bunch of bad memory accesses in EditorAnimationPage when current
+  animation has fewer sounds than mCurrentSound.
+
+--Fixed potentially incorrect assumption with extra animation slot indexing
+  (where we were assuming that the list of extra animations for an object is
+   in-order and doesn't skip any extra slots.  This might actually be enforced
+   by the editor, but it's not enforced by the animation bank (you can insert
+   extra animations with any extra slot ids and in any order, not just
+   sequentially increasing from zero).  In various spots in the code, we were
+   walking through every extra animation for an object, assuming we could index
+   them using extra slot ids 0...n where we determined that there were n+1
+   extra animations defined for the object.
+
+--Editor now supports exporting resource bundles into exports folder.  These
+  can be loaded by game client as mods from the mods folder.
+
+--Editor supports loading mods from mods folder.  Note that just like with
+  game client, these are loaded into RAM only, and do not change any disk
+  content.  However, if you Save an object inside the Editor, the disk content
+  will get changed, which may save moded content over the baseline content.
+  This allows people to load mods created by others, add to them and work on
+  them, and then re-export an object bundle as a new mod.
+
+
 
 
 

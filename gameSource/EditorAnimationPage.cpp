@@ -722,86 +722,103 @@ static void cloneExtrasBetweenPeople( int inSourceObjectID,
     // clear the old ones first, because we might have a
     // different number of extras now
     int oldExtras = getNumExtraAnim( inDestObjectID );
-        
-    for( int i=0; i<oldExtras; i++ ) {
-        setExtraIndex( i );
-        clearAnimation( inDestObjectID, extra );
+    
+    if( oldExtras > 0 ) {
+        AnimationRecord **extras = getAllExtraAnimations( inDestObjectID );    
+
+        for( int e=0; e<oldExtras; e++ ) {
+            AnimationRecord *r = extras[e];
+            
+            setExtraIndex( r->extraIndex );
+            clearAnimation( inDestObjectID, extra );
+            }
+        delete [] extras;
         }
+    
 
         
-    int newExtras = getNumExtraAnim( inSourceObjectID );
+    int newExtras = getNumExtraAnim( inSourceObjectID );        
+
+    if( newExtras > 0 ) {
+
+        AnimationRecord **extras = getAllExtraAnimations( inSourceObjectID );
         
+        for( int e=0; e < newExtras; e++ ) {
+            AnimationRecord *sourceR = extras[e];
 
-    for( int i=0; i < newExtras; i++ ) {
-        setExtraIndex( i );
+            setExtraIndex( sourceR->extraIndex );
 
-        AnimationRecord *newRecord = 
-            createRecordForObject( inDestObjectID, extra );
+            AnimationRecord *newRecord = 
+                createRecordForObject( inDestObjectID, extra );
             
-        AnimationRecord *sourceRecord = getAnimation( inSourceObjectID,
-                                                      extra );
+            AnimationRecord *sourceRecord = getAnimation( inSourceObjectID,
+                                                          extra );
             
-        delete [] newRecord->soundAnim;
+            delete [] newRecord->soundAnim;
             
-        newRecord->numSounds = sourceRecord->numSounds;
+            newRecord->numSounds = sourceRecord->numSounds;
             
-        newRecord->soundAnim = 
-            new SoundAnimationRecord[ newRecord->numSounds ];
-        for( int s=0; s < newRecord->numSounds; s++ ) {
-            newRecord->soundAnim[s] = 
-                copyRecord( sourceRecord->soundAnim[s] );
-            }
-            
-
-        for( int s=0; s < sourceRecord->numSlots; s++ ) {
-            if( s < currentO->numSlots ) {
-                newRecord->slotAnim[s] = sourceRecord->slotAnim[s];
+            newRecord->soundAnim = 
+                new SoundAnimationRecord[ newRecord->numSounds ];
+            for( int s=0; s < newRecord->numSounds; s++ ) {
+                newRecord->soundAnim[s] = 
+                    copyRecord( sourceRecord->soundAnim[s] );
                 }
-            }
             
             
-
-        // walk through each sprite animation in sourceRecord
-        // For each one, look at sprite's:
-        //  --id
-        //  --position
-        //  --age start and end
-        // Then walk through the inDestObjectID object and look
-        // for a sprite that matches all three of these things
-        //
-        // --If found, copy that sprite animation into the corresponding
-        //   slot in newRecord
-
-        for( int s=0; s < sourceRecord->numSprites; s++ ) {
-                
-            int id = sourceO->sprites[s];
-            doublePair pos = sourceO->spritePos[s];
-                
-            double ageStart = sourceO->spriteAgeStart[s];
-            double ageEnd = sourceO->spriteAgeEnd[s];
-                
-                
-            for( int s2=0; s2 < currentO->numSprites; s2++ ) {
-                    
-                if( currentO->sprites[s2] == id 
-                    &&
-                    equal( currentO->spritePos[s2], pos )
-                    &&
-                    currentO->spriteAgeStart[s2] == ageStart
-                    &&
-                    currentO->spriteAgeEnd[s2] == ageEnd ) {
-                        
-                    // a match
-                        
-                    newRecord->spriteAnim[s2] =
-                        sourceRecord->spriteAnim[s];
+            for( int s=0; s < sourceRecord->numSlots; s++ ) {
+                if( s < currentO->numSlots ) {
+                    newRecord->slotAnim[s] = sourceRecord->slotAnim[s];
                     }
                 }
-            }
-        addAnimation( newRecord );
             
-        freeRecord( newRecord );
-        }        
+            
+            
+            // walk through each sprite animation in sourceRecord
+            // For each one, look at sprite's:
+            //  --id
+            //  --position
+            //  --age start and end
+            // Then walk through the inDestObjectID object and look
+            // for a sprite that matches all three of these things
+            //
+            // --If found, copy that sprite animation into the corresponding
+            //   slot in newRecord
+
+            for( int s=0; s < sourceRecord->numSprites; s++ ) {
+                
+                int id = sourceO->sprites[s];
+                doublePair pos = sourceO->spritePos[s];
+                
+                double ageStart = sourceO->spriteAgeStart[s];
+                double ageEnd = sourceO->spriteAgeEnd[s];
+                
+                
+                for( int s2=0; s2 < currentO->numSprites; s2++ ) {
+                    
+                    if( currentO->sprites[s2] == id 
+                        &&
+                        equal( currentO->spritePos[s2], pos )
+                        &&
+                        currentO->spriteAgeStart[s2] == ageStart
+                        &&
+                        currentO->spriteAgeEnd[s2] == ageEnd ) {
+                        
+                        // a match
+                        
+                        newRecord->spriteAnim[s2] =
+                            sourceRecord->spriteAnim[s];
+                        }
+                    }
+                }
+            addAnimation( newRecord );
+            
+            freeRecord( newRecord );
+            }
+        
+        delete [] extras;
+        }
+    
     }
 
         
@@ -886,30 +903,39 @@ void EditorAnimationPage::populateCurrentAnim() {
 
     int numExtra = getNumExtraAnim( mCurrentObjectID );
         
-    for( int i=0; i<numExtra; i++ ) {
-        setExtraIndex( i );
+    if( numExtra > 0 ) {
+        AnimationRecord **extras = getAllExtraAnimations( mCurrentObjectID );
 
-        AnimationRecord *oldRecord =
-            getAnimation( mCurrentObjectID, extra );
-        
-        mCurrentExtraAnim.push_back( copyRecord( oldRecord ) );
-        
-
-        mCurrentAnim[extra] = mCurrentExtraAnim.getElementDirect( 
-            mCurrentExtraAnim.size() - 1 );
-
-        adjustRecordList( &( mCurrentAnim[extra]->spriteAnim ),
-                          mCurrentAnim[extra]->numSprites,
-                          sprites );
-        
-        mCurrentAnim[extra]->numSprites = sprites;
+        for( int e=0; e<numExtra; e++ ) {
+            AnimationRecord *r = extras[e];
             
-        adjustRecordList( &( mCurrentAnim[extra]->slotAnim ),
-                          mCurrentAnim[extra]->numSlots,
-                          slots );
+            setExtraIndex( r->extraIndex );
+
+            AnimationRecord *oldRecord =
+                getAnimation( mCurrentObjectID, extra );
         
-        mCurrentAnim[extra]->numSlots = slots;
-        }        
+            mCurrentExtraAnim.push_back( copyRecord( oldRecord ) );
+        
+            
+            mCurrentAnim[extra] = mCurrentExtraAnim.getElementDirect( 
+                mCurrentExtraAnim.size() - 1 );
+
+            adjustRecordList( &( mCurrentAnim[extra]->spriteAnim ),
+                              mCurrentAnim[extra]->numSprites,
+                              sprites );
+        
+            mCurrentAnim[extra]->numSprites = sprites;
+            
+            adjustRecordList( &( mCurrentAnim[extra]->slotAnim ),
+                              mCurrentAnim[extra]->numSlots,
+                              slots );
+            
+            mCurrentAnim[extra]->numSlots = slots;
+            }
+        
+        delete [] extras;
+        }
+    
     
     if( numExtra > 0 ) {
         mCurrentExtraIndex = 0;
@@ -1456,12 +1482,20 @@ void EditorAnimationPage::actionPerformed( GUIComponent *inTarget ) {
         // clear the old ones first, because we might have a
         // different number of extras now
         int oldExtras = getNumExtraAnim( mCurrentObjectID );
-        
-        for( int i=0; i<oldExtras; i++ ) {
-            setExtraIndex( i );
-            clearAnimation( mCurrentObjectID, extra );
-            }
+    
+        if( oldExtras > 0 ) {
+            AnimationRecord **extras =
+                getAllExtraAnimations( mCurrentObjectID );    
 
+            for( int e=0; e<oldExtras; e++ ) {
+                AnimationRecord *r = extras[e];
+            
+                setExtraIndex( r->extraIndex );
+                clearAnimation( mCurrentObjectID, extra );
+                }
+            delete [] extras;
+            }
+        
         for( int i=0; i<mCurrentExtraAnim.size(); i++ ) {
             setExtraIndex( i );
             addAnimation( mCurrentExtraAnim.getElementDirect( i ) );
@@ -1484,18 +1518,20 @@ void EditorAnimationPage::actionPerformed( GUIComponent *inTarget ) {
         updateSlidersFromAnim();
         }
     else if( inTarget == &mCopySoundAnimButton ) {
-        SoundAnimationRecord oldR = mSoundAnimCopyBuffer;
-        
-        
-        mSoundAnimCopyBuffer = 
-            copyRecord( mCurrentAnim[ mCurrentType ]->
-                        soundAnim[ mCurrentSound ] );
-        
-        freeRecord( &oldR );
-
-        if( mSoundAnimCopyBuffer.sound.numSubSounds > 0 ) {
-            mPasteSoundAnimButton.setVisible( true );
-            }        
+        if( mCurrentSound < mCurrentAnim[ mCurrentType ]->numSounds ) {
+            SoundAnimationRecord oldR = mSoundAnimCopyBuffer;
+            
+            
+            mSoundAnimCopyBuffer = 
+                copyRecord( mCurrentAnim[ mCurrentType ]->
+                            soundAnim[ mCurrentSound ] );
+            
+            freeRecord( &oldR );
+            
+            if( mSoundAnimCopyBuffer.sound.numSubSounds > 0 ) {
+                mPasteSoundAnimButton.setVisible( true );
+                }
+            }
         }
     else if( inTarget == &mPlayAgeButton ) {
         if( !mPlayingAge ) {
@@ -1588,20 +1624,23 @@ void EditorAnimationPage::actionPerformed( GUIComponent *inTarget ) {
                 }
             else {
                 // add new
+                int oldNumSounds = mCurrentAnim[ mCurrentType ]->numSounds;
+                SoundAnimationRecord *oldSounds = 
+                    mCurrentAnim[ mCurrentType ]-> soundAnim;
+
                 mCurrentAnim[ mCurrentType ]->numSounds++;
-                SoundAnimationRecord *old = mCurrentAnim[ mCurrentType ]->
-                    soundAnim;
                 
                 mCurrentAnim[ mCurrentType ]->soundAnim = 
                     new SoundAnimationRecord[ 
                         mCurrentAnim[ mCurrentType ]->numSounds ];
                 
-                memcpy( mCurrentAnim[ mCurrentType ]->soundAnim,
-                        old,
-                        sizeof( SoundAnimationRecord ) *
-                        mCurrentAnim[ mCurrentType ]->numSounds - 1 );
+                if( oldNumSounds > 0 ) {
+                    memcpy( mCurrentAnim[ mCurrentType ]->soundAnim,
+                            oldSounds,
+                            sizeof( SoundAnimationRecord ) * oldNumSounds );
+                    }
                 
-                delete [] old;
+                delete [] oldSounds;
 
                 mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ] =
                     copyRecord( mSoundAnimCopyBuffer );
@@ -1612,9 +1651,9 @@ void EditorAnimationPage::actionPerformed( GUIComponent *inTarget ) {
             // make sure there's no age range set in pasted sound anim
             // it may have been copied from a person object
             for( int i=0; i<mCurrentAnim[ mCurrentType ]->numSounds; i++ ) {
-                mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].
+                mCurrentAnim[ mCurrentType ]->soundAnim[ i ].
                     ageStart = -1;
-                mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].
+                mCurrentAnim[ mCurrentType ]->soundAnim[ i ].
                     ageEnd = -1;
                 }
             }
@@ -2369,19 +2408,22 @@ void EditorAnimationPage::actionPerformed( GUIComponent *inTarget ) {
             }
         else if( u.numSubSounds > 0 ) {
             // expand it to make room
-            mCurrentAnim[ mCurrentType ]->numSounds++;
-            SoundAnimationRecord *old = mCurrentAnim[ mCurrentType ]->soundAnim;
+            int oldNumSounds = mCurrentAnim[ mCurrentType ]->numSounds;
+            SoundAnimationRecord *oldSounds
+                = mCurrentAnim[ mCurrentType ]->soundAnim;
             
+            mCurrentAnim[ mCurrentType ]->numSounds++;
             mCurrentAnim[ mCurrentType ]->soundAnim = 
                 new SoundAnimationRecord[ 
                     mCurrentAnim[ mCurrentType ]->numSounds ];
             
-            memcpy( mCurrentAnim[ mCurrentType ]->soundAnim,
-                    old,
-                    sizeof( SoundAnimationRecord ) *
-                    mCurrentAnim[ mCurrentType ]->numSounds - 1 );
+            if( oldNumSounds > 0 ) {
+                memcpy( mCurrentAnim[ mCurrentType ]->soundAnim,
+                        oldSounds,
+                        sizeof( SoundAnimationRecord ) * oldNumSounds );
+                }
             
-            delete [] old;
+            delete [] oldSounds;
 
             mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].sound = 
                 copyUsage( u );
@@ -2407,31 +2449,47 @@ void EditorAnimationPage::actionPerformed( GUIComponent *inTarget ) {
         if( value < 0 ) {
             value = 0;
             }
-        mCurrentAnim[ mCurrentType ]->
-            soundAnim[ mCurrentSound ].ageStart = value;
+        
+        if( mCurrentSound < mCurrentAnim[ mCurrentType ]->numSounds ) {
+            mCurrentAnim[ mCurrentType ]->
+                soundAnim[ mCurrentSound ].ageStart = value;
+            }
         }
     else if( inTarget == &mSoundAgeOutField ) {
         float value = mSoundAgeOutField.getFloat();
         if( value < 0 ) {
             value = 0;
             }
-        mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].ageEnd = value;
+        if( mCurrentSound < mCurrentAnim[ mCurrentType ]->numSounds ) {
+            mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].ageEnd = 
+                value;
+            }
         }
     else if( inTarget == &mSoundAgePunchInButton ) {
         double in = mPersonAgeSlider.getValue();
-        mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].ageStart = in;
+        
+        if( mCurrentSound < mCurrentAnim[ mCurrentType ]->numSounds ) {
+            mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].ageStart =
+                in;
+            }
         
         mSoundAgeInField.setFloat( in, 2 );
         }
     else if( inTarget == &mSoundAgePunchOutButton ) {
         double out = mPersonAgeSlider.getValue();
-        mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].ageEnd = out;
+
+        if( mCurrentSound < mCurrentAnim[ mCurrentType ]->numSounds ) {
+            mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].ageEnd =
+                out;
+            }
         
         mSoundAgeOutField.setFloat( out, 2 );
         }
     else if( inTarget == &mSoundFootstepButton ) {
-        mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].footstep
-            = mSoundFootstepButton.getToggled();
+        if( mCurrentSound < mCurrentAnim[ mCurrentType ]->numSounds ) {
+            mCurrentAnim[ mCurrentType ]->soundAnim[ mCurrentSound ].footstep
+                = mSoundFootstepButton.getToggled();
+            }
         }
     else if( inTarget == &mNextSoundButton ) {
         mCurrentSound ++;
@@ -2443,14 +2501,18 @@ void EditorAnimationPage::actionPerformed( GUIComponent *inTarget ) {
         soundIndexChanged();
         }
     else if( inTarget == &mSoundRepeatPerSecSlider ) {
-        mCurrentAnim[ mCurrentType ]->
+        if( mCurrentSound < mCurrentAnim[ mCurrentType ]->numSounds ) {
+            mCurrentAnim[ mCurrentType ]->
                 soundAnim[ mCurrentSound ].repeatPerSec = 
-            mSoundRepeatPerSecSlider.getValue();
+                mSoundRepeatPerSecSlider.getValue();
+            }
         }
     else if( inTarget == &mSoundRepeatPhaseSlider ) {
-        mCurrentAnim[ mCurrentType ]->
+        if( mCurrentSound < mCurrentAnim[ mCurrentType ]->numSounds ) {
+            mCurrentAnim[ mCurrentType ]->
                 soundAnim[ mCurrentSound ].repeatPhase = 
-            mSoundRepeatPhaseSlider.getValue();
+                mSoundRepeatPhaseSlider.getValue();
+            }
         }
     else if( inTarget == &mReverseRotationCheckbox ) {
         updateAnimFromSliders();

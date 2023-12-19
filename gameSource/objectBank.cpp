@@ -268,7 +268,12 @@ void setDrawColor( FloatRGB inColor ) {
 
 
 static char shouldFileBeCached( char *inFileName ) {
-    if( strstr( inFileName, ".txt" ) != NULL &&
+    char *txtPos = strstr( inFileName, ".txt" );
+
+    if( txtPos != NULL &&
+        // file name ends with .txt
+        txtPos[4] == '\0' &&
+        // not a groundHeat or nextObjectNumber file
         strstr( inFileName, "groundHeat_" ) == NULL &&
         strcmp( inFileName, "nextObjectNumber.txt" ) != 0 ) {
         return true;
@@ -1026,6 +1031,800 @@ int getMaxSpeechPipeIndex() {
 
 
 
+
+
+// this scans an ObjectRecord from a string,
+// but it does NOT add it to our ID map.
+// 
+// It DOES NOT add the scanned objectID to our tracking lists, like:
+// deathMarkerObjectIDs, allPossibleFoodIDs, etc.
+// 
+// It also does NOT call the certain setup functions on the object
+// (since some of these have global effects):
+// List of setups not called:
+//
+// setupObjectSpeechPipe
+ObjectRecord *scanObjectRecordFromString( const char *inString ) {
+    int numLines;
+                        
+    char **lines = split( inString, "\n", &numLines );
+
+    ObjectRecord *r = NULL;
+    
+    if( numLines >= 14 ) {
+        r = new ObjectRecord;
+                            
+        int next = 0;
+                
+        r->id = 0;
+        sscanf( lines[next], "id=%d", 
+                &( r->id ) );
+                
+        if( r->id > maxID ) {
+            maxID = r->id;
+            }
+                
+        next++;
+                            
+        r->description = stringDuplicate( lines[next] );
+                         
+
+        setupObjectWritingStatus( r );
+                
+        setupObjectGlobalTriggers( r );                
+                
+        setupFlight( r );
+                
+        setupOwned( r );
+                
+        setupNoHighlight( r );
+                
+        setupMaxPickupAge( r );
+                
+        setupAutoDefaultTrans( r );
+                
+        setupNoBackAccess( r );                
+
+        setupAlcohol( r );
+                
+        setupFamHomeland( r );
+                
+        setupForcedBiome( r );
+                
+        setupExpertFind( r );
+
+        setupNormalOnly( r );
+
+        setupYumParent( r );
+                
+        setupRoadParent( r );
+                
+        setupSlotsInvis( r );
+                
+        setupVarSerialNumber( r );
+
+        setupVarIsNumeral( r );
+
+
+        // do this later, after we parse floorHugging
+        // setupWall( r );
+                
+
+        r->isAutoOrienting = false;
+        r->causeAutoOrientHOnly = false;
+        r->causeAutoOrientVOnly = false;
+        r->horizontalVersionID = -1;
+        r->verticalVersionID = -1;
+        r->cornerVersionID = -1;
+
+        next++;
+                            
+        int contRead = 0;                            
+        sscanf( lines[next], "containable=%d", 
+                &( contRead ) );
+                            
+        r->containable = contRead;
+                            
+        next++;
+                    
+        r->containSize = 1;
+        r->vertContainRotationOffset = 0;
+                
+        sscanf( lines[next], "containSize=%f,vertSlotRot=%lf", 
+                &( r->containSize ),
+                &( r->vertContainRotationOffset ) );
+                            
+        next++;
+                            
+        int permRead = 0;                 
+        r->minPickupAge = 3;
+        sscanf( lines[next], "permanent=%d,minPickupAge=%d", 
+                &( permRead ),
+                &( r->minPickupAge ) );
+                            
+        r->permanent = permRead;
+
+        next++;
+
+
+
+        r->noFlip = false;
+
+        if( strstr( lines[next], "noFlip=" ) != NULL ) {
+            int noFlipRead = 0;
+                    
+            sscanf( lines[next], "noFlip=%d", 
+                    &( noFlipRead ) );
+                            
+            r->noFlip = noFlipRead;
+
+            next++;
+            }
+
+        r->sideAccess = false;
+
+        if( strstr( lines[next], "sideAccess=" ) != NULL ) {
+            int sideAccessRead = 0;
+                    
+            sscanf( lines[next], "sideAccess=%d", 
+                    &( sideAccessRead ) );
+                            
+            r->sideAccess = sideAccessRead;
+
+            next++;
+            }
+                
+
+
+
+        int heldInHandRead = 0;                            
+        sscanf( lines[next], "heldInHand=%d", 
+                &( heldInHandRead ) );
+                          
+        r->heldInHand = false;
+        r->rideable = false;
+                
+        if( heldInHandRead == 1 ) {
+            r->heldInHand = true;
+            }
+        else if( heldInHandRead == 2 ) {
+            r->rideable = true;
+            }
+
+        next++;
+
+
+        int blocksWalkingRead = 0;                            
+                
+        r->leftBlockingRadius = 0;
+        r->rightBlockingRadius = 0;
+                
+        int drawBehindPlayerRead = 0;
+                
+        sscanf( lines[next], 
+                "blocksWalking=%d,"
+                "leftBlockingRadius=%d,rightBlockingRadius=%d,"
+                "drawBehindPlayer=%d",
+                &( blocksWalkingRead ),
+                &( r->leftBlockingRadius ),
+                &( r->rightBlockingRadius ),
+                &( drawBehindPlayerRead ) );
+                            
+        r->blocksWalking = blocksWalkingRead;
+        r->drawBehindPlayer = drawBehindPlayerRead;
+                
+        r->wide = ( r->leftBlockingRadius > 0 || 
+                    r->rightBlockingRadius > 0 );
+
+        if( r->wide ) {
+            r->drawBehindPlayer = true;
+                    
+            if( r->leftBlockingRadius > maxWideRadius ) {
+                maxWideRadius = r->leftBlockingRadius;
+                }
+            if( r->rightBlockingRadius > maxWideRadius ) {
+                maxWideRadius = r->rightBlockingRadius;
+                }
+            }
+                    
+
+        next++;
+
+                
+        setupBlocksMoving( r );
+        setupBlocksNonFollower( r );
+        setupBadgePos( r );
+        setupHideHead( r );
+        setupHideBody( r );
+        setupHideRider( r );
+        setupNeverDrop( r );
+        setupGiveClue( r );
+        setupNearPop( r );
+        setupContainOffset( r );
+                
+                
+        r->mapChance = 0;      
+        char biomeString[200];
+        int numRead = sscanf( lines[next], 
+                              "mapChance=%f#biomes_%199s", 
+                              &( r->mapChance ), biomeString );
+                
+        if( numRead != 2 ) {
+            // biome not present (old format), treat as 0
+            biomeString[0] = '0';
+            biomeString[1] = '\0';
+                    
+            sscanf( lines[next], "mapChance=%f", &( r->mapChance ) );
+                
+            // NOTE:  I've avoided too many of these format
+            // bandaids, and forced whole-folder file rewrites 
+            // in the past.
+            // But now we're part way into production, so bandaids
+            // are more effective.
+            }
+                
+        fillObjectBiomeFromString( r, biomeString );
+
+        next++;
+
+
+        r->heatValue = 0;                            
+        sscanf( lines[next], "heatValue=%d", 
+                &( r->heatValue ) );
+                            
+        next++;
+
+                            
+
+        r->rValue = 0;                            
+        sscanf( lines[next], "rValue=%f", 
+                &( r->rValue ) );
+                            
+        next++;
+
+
+
+        int personRead = 0;                            
+        int noSpawnRead = 0;
+        sscanf( lines[next], "person=%d,noSpawn=%d", 
+                &personRead, &noSpawnRead );
+                            
+        r->person = ( personRead > 0 );
+                
+        r->race = personRead;
+                
+        r->personNoSpawn = noSpawnRead;
+
+        next++;
+
+
+        int maleRead = 0;                            
+        sscanf( lines[next], "male=%d", 
+                &( maleRead ) );
+                    
+        r->male = maleRead;
+                            
+        next++;
+
+
+        int deathMarkerRead = 0;     
+        sscanf( lines[next], "deathMarker=%d", 
+                &( deathMarkerRead ) );
+                    
+        r->deathMarker = deathMarkerRead;
+                
+        next++;
+                
+                
+
+        r->homeMarker = false;
+                
+        if( strstr( lines[next], "homeMarker=" ) != NULL ) {
+            // home marker flag present
+                    
+            int homeMarkerRead = 0;
+            sscanf( lines[next], "homeMarker=%d", &( homeMarkerRead ) );
+                    
+            r->homeMarker = homeMarkerRead;
+                    
+            next++;
+            }
+
+
+
+        r->floor = false;
+                
+        if( strstr( lines[next], "floor=" ) != NULL ) {
+            // floor flag present
+                    
+            int floorRead = 0;
+            sscanf( lines[next], "floor=%d", &( floorRead ) );
+                    
+            r->floor = floorRead;
+                    
+            next++;
+            }
+
+
+        r->floorHugging = false;
+                
+        if( strstr( lines[next], "floorHugging=" ) != NULL ) {
+            // floorHugging flag present
+                    
+            int hugRead = 0;
+            sscanf( lines[next], "floorHugging=%d", &( hugRead ) );
+                    
+            r->floorHugging = hugRead;
+                    
+            next++;
+            }
+
+
+        setupWall( r );
+
+                            
+        sscanf( lines[next], "foodValue=%d", 
+                &( r->foodValue ) );
+                
+        if( r->foodValue > maxFoodValue ) {
+            maxFoodValue = r->foodValue;
+            }
+                
+                
+        next++;
+                            
+                            
+                            
+        sscanf( lines[next], "speedMult=%f", 
+                &( r->speedMult ) );
+                            
+        next++;
+
+
+
+        r->heldOffset.x = 0;
+        r->heldOffset.y = 0;
+                            
+        sscanf( lines[next], "heldOffset=%lf,%lf", 
+                &( r->heldOffset.x ),
+                &( r->heldOffset.y ) );
+                            
+        next++;
+
+
+
+        r->clothing = 'n';
+                            
+        sscanf( lines[next], "clothing=%c", 
+                &( r->clothing ));
+                            
+        next++;
+                            
+                            
+                            
+        r->clothingOffset.x = 0;
+        r->clothingOffset.y = 0;
+                            
+        sscanf( lines[next], "clothingOffset=%lf,%lf", 
+                &( r->clothingOffset.x ),
+                &( r->clothingOffset.y ) );
+                            
+        next++;
+                            
+                    
+        r->deadlyDistance = 0;
+        sscanf( lines[next], "deadlyDistance=%d", 
+                &( r->deadlyDistance ) );
+                            
+        next++;
+                
+                
+        r->useDistance = 1;
+                
+        if( strstr( lines[next], 
+                    "useDistance=" ) != NULL ) {
+            // use distance present
+                    
+            sscanf( lines[next], "useDistance=%d", 
+                    &( r->useDistance ) );
+                    
+            next++;
+            }
+                
+
+        r->creationSound = blankSoundUsage;
+        r->usingSound = blankSoundUsage;
+        r->eatingSound = blankSoundUsage;
+        r->decaySound = blankSoundUsage;
+                
+                
+        if( strstr( lines[next], "sounds=" ) != NULL ) {
+            // sounds present
+
+            int numParts = 0;
+                    
+            char **parts = split( &( lines[next][7] ), ",", &numParts );
+                    
+            if( numParts == 4 ) {
+                r->creationSound = scanSoundUsage( parts[0] );
+                r->usingSound = scanSoundUsage( parts[1] );
+                r->eatingSound = scanSoundUsage( parts[2] );
+                r->decaySound = scanSoundUsage( parts[3] );
+                }
+                    
+            for( int i=0; i<numParts; i++ ) {
+                delete [] parts[i];
+                }
+            delete [] parts;
+
+            next++;
+            }
+                
+        if( strstr( lines[next], 
+                    "creationSoundInitialOnly=" ) != NULL ) {
+            // flag present
+                    
+            int flagRead = 0;                            
+            sscanf( lines[next], "creationSoundInitialOnly=%d", 
+                    &( flagRead ) );
+                    
+            r->creationSoundInitialOnly = flagRead;
+                            
+            next++;
+            }
+        else {
+            r->creationSoundInitialOnly = 0;
+            }
+                
+        if( strstr( lines[next], 
+                    "creationSoundForce=" ) != NULL ) {
+            // flag present
+                    
+            int flagRead = 0;                            
+            sscanf( lines[next], "creationSoundForce=%d", 
+                    &( flagRead ) );
+                    
+            r->creationSoundForce = flagRead;
+                            
+            next++;
+            }
+        else {
+            r->creationSoundForce = 0;
+            }
+
+
+        r->numSlots = 0;
+        r->slotTimeStretch = 1.0f;
+                
+                
+        if( strstr( lines[next], "#" ) != NULL ) {
+            sscanf( lines[next], "numSlots=%d#timeStretch=%f", 
+                    &( r->numSlots ),
+                    &( r->slotTimeStretch ) );
+            }
+        else {
+            sscanf( lines[next], "numSlots=%d", 
+                    &( r->numSlots ) );
+            }
+                
+
+        next++;
+
+        r->slotSize = 1;
+        sscanf( lines[next], "slotSize=%f", 
+                &( r->slotSize ) );
+                            
+        next++;
+
+        r->slotsLocked = 0;
+        if( strstr( lines[next], 
+                    "slotsLocked=" ) != NULL ) {
+            // flag present
+                    
+            int flagRead = 0;                            
+            sscanf( lines[next], "slotsLocked=%d", 
+                    &( flagRead ) );
+                    
+            r->slotsLocked = flagRead;
+                            
+            next++;
+            }
+                
+                
+        r->slotPos = new doublePair[ r->numSlots ];
+        r->slotVert = new char[ r->numSlots ];
+        r->slotParent = new int[ r->numSlots ];
+            
+        for( int i=0; i< r->numSlots; i++ ) {
+            r->slotVert[i] = false;
+            r->slotParent[i] = -1;
+                    
+            int vertRead = 0;
+            sscanf( lines[ next ], "slotPos=%lf,%lf,vert=%d,parent=%d", 
+                    &( r->slotPos[i].x ),
+                    &( r->slotPos[i].y ),
+                    &vertRead,
+                    &( r->slotParent[i] ) );
+            r->slotVert[i] = vertRead;
+            next++;
+            }
+                            
+
+        r->numSprites = 0;
+        sscanf( lines[next], "numSprites=%d", 
+                &( r->numSprites ) );
+                            
+        next++;
+
+        r->sprites = new int[r->numSprites];
+        r->spritePos = new doublePair[ r->numSprites ];
+        r->spriteRot = new double[ r->numSprites ];
+        r->spriteHFlip = new char[ r->numSprites ];
+        r->spriteColor = new FloatRGB[ r->numSprites ];
+                    
+        r->spriteAgeStart = new double[ r->numSprites ];
+        r->spriteAgeEnd = new double[ r->numSprites ];
+
+        r->spriteParent = new int[ r->numSprites ];
+        r->spriteInvisibleWhenHolding = new char[ r->numSprites ];
+        r->spriteInvisibleWhenWorn = new int[ r->numSprites ];
+        r->spriteBehindSlots = new char[ r->numSprites ];
+        r->spriteInvisibleWhenContained = new char[ r->numSprites ];
+
+
+        r->spriteIsHead = new char[ r->numSprites ];
+        r->spriteIsBody = new char[ r->numSprites ];
+        r->spriteIsBackFoot = new char[ r->numSprites ];
+        r->spriteIsFrontFoot = new char[ r->numSprites ];
+                
+
+        memset( r->spriteIsHead, false, r->numSprites );
+        memset( r->spriteIsBody, false, r->numSprites );
+        memset( r->spriteIsBackFoot, false, r->numSprites );
+        memset( r->spriteIsFrontFoot, false, r->numSprites );
+                
+                
+        r->numUses = 1;
+        r->useChance = 1.0f;
+                
+        r->spriteUseVanish = new char[ r->numSprites ];
+        r->spriteUseAppear = new char[ r->numSprites ];
+        r->useDummyIDs = NULL;
+        r->isUseDummy = false;
+        r->useDummyParent = 0;
+        r->thisUseDummyIndex = -1;
+                
+        r->cachedHeight = -1;
+                
+        memset( r->spriteUseVanish, false, r->numSprites );
+        memset( r->spriteUseAppear, false, r->numSprites );
+
+        r->spriteSkipDrawing = new char[ r->numSprites ];
+        memset( r->spriteSkipDrawing, false, r->numSprites );
+                
+        r->apocalypseTrigger = false;
+        if( r->description[0] == 'T' &&
+            r->description[1] == 'h' &&
+            strstr( r->description, "The Apocalypse" ) == 
+            r->description ) {
+                    
+            printf( "Object id %d (%s) seen as an apocalypse trigger\n",
+                    r->id, r->description );
+
+            r->apocalypseTrigger = true;
+            }
+
+        r->monumentStep = false;
+        r->monumentDone = false;
+        r->monumentCall = false;
+                
+        if( strstr( r->description, "monument" ) != NULL ) {
+            // some kind of monument state
+            if( strstr( r->description, "monumentStep" ) != NULL ) {
+                r->monumentStep = true;
+                }
+            else if( strstr( r->description, 
+                             "monumentDone" ) != NULL ) {
+                r->monumentDone = true;
+                }
+            else if( strstr( r->description, 
+                             "monumentCall" ) != NULL ) {
+                r->monumentCall = true;
+                }
+            }
+                
+        r->numVariableDummyIDs = 0;
+        r->variableDummyIDs = NULL;
+        r->isVariableDummy = false;
+        r->variableDummyParent = 0;
+        r->thisVariableDummyIndex = -1;
+        r->isVariableHidden = false;
+                
+
+        for( int i=0; i< r->numSprites; i++ ) {
+            sscanf( lines[next], "spriteID=%d", 
+                    &( r->sprites[i] ) );
+                                
+            next++;
+                                
+            sscanf( lines[next], "pos=%lf,%lf", 
+                    &( r->spritePos[i].x ),
+                    &( r->spritePos[i].y ) );
+                                
+            next++;
+                                
+            sscanf( lines[next], "rot=%lf", 
+                    &( r->spriteRot[i] ) );
+                                
+            next++;
+                                
+                        
+            int flipRead = 0;
+                                
+            sscanf( lines[next], "hFlip=%d", &flipRead );
+                                
+            r->spriteHFlip[i] = flipRead;
+                                
+            next++;
+
+
+            sscanf( lines[next], "color=%f,%f,%f", 
+                    &( r->spriteColor[i].r ),
+                    &( r->spriteColor[i].g ),
+                    &( r->spriteColor[i].b ) );
+                                
+            next++;
+
+
+            sscanf( lines[next], "ageRange=%lf,%lf", 
+                    &( r->spriteAgeStart[i] ),
+                    &( r->spriteAgeEnd[i] ) );
+                                
+            next++;
+                        
+
+            sscanf( lines[next], "parent=%d", 
+                    &( r->spriteParent[i] ) );
+                        
+            next++;
+
+
+            int invisRead = 0;
+            int invisWornRead = 0;
+            int behindSlotsRead = 0;
+                    
+            sscanf( lines[next], 
+                    "invisHolding=%d,invisWorn=%d,behindSlots=%d", 
+                    &invisRead, &invisWornRead,
+                    &behindSlotsRead );
+                                
+            r->spriteInvisibleWhenHolding[i] = invisRead;
+            r->spriteInvisibleWhenWorn[i] = invisWornRead;
+            r->spriteBehindSlots[i] = behindSlotsRead;
+                                
+            next++;                       
+                    
+            if( strstr( lines[next], "invisCont=" ) != NULL ) {
+                invisRead = 0;
+                sscanf( lines[next], "invisCont=%d", &invisRead );
+                        
+                r->spriteInvisibleWhenContained[i] = invisRead;
+                next++;
+                }
+            else {
+                r->spriteInvisibleWhenContained[i] = 0;
+                }
+            }
+                
+
+        r->anySpritesBehindPlayer = false;
+        r->spriteBehindPlayer = NULL;
+
+        if( strstr( lines[next], "spritesDrawnBehind=" ) != NULL ) {
+            r->anySpritesBehindPlayer = true;
+            r->spriteBehindPlayer = new char[ r->numSprites ];
+            memset( r->spriteBehindPlayer, false, r->numSprites );
+            sparseCommaLineToBoolArray( "spritesDrawnBehind", 
+                                        lines[next],
+                                        r->spriteBehindPlayer, 
+                                        r->numSprites );
+            next++;
+            }
+                
+
+        r->spriteAdditiveBlend = NULL;
+
+        if( strstr( lines[next], "spritesAdditiveBlend=" ) != NULL ) {
+            r->spriteAdditiveBlend = new char[ r->numSprites ];
+            memset( r->spriteAdditiveBlend, false, r->numSprites );
+            sparseCommaLineToBoolArray( "spritesAdditiveBlend", 
+                                        lines[next],
+                                        r->spriteAdditiveBlend, 
+                                        r->numSprites );
+            next++;
+            }
+
+                    
+        r->spriteNoFlipXPos = NULL;
+
+
+        sparseCommaLineToBoolArray( "headIndex", lines[next],
+                                    r->spriteIsHead, r->numSprites );
+        next++;
+
+
+        sparseCommaLineToBoolArray( "bodyIndex", lines[next],
+                                    r->spriteIsBody, r->numSprites );
+        next++;
+
+
+        sparseCommaLineToBoolArray( "backFootIndex", lines[next],
+                                    r->spriteIsBackFoot, 
+                                    r->numSprites );
+        next++;
+
+
+        sparseCommaLineToBoolArray( "frontFootIndex", lines[next],
+                                    r->spriteIsFrontFoot, 
+                                    r->numSprites );
+        next++;
+                
+                
+        setupEyesAndMouth( r );
+
+
+        if( next < numLines ) {
+            // info about num uses and vanish/appear sprites
+                    
+            sscanf( lines[next], "numUses=%d,%f", 
+                    &( r->numUses ),
+                    &( r->useChance ) );
+                            
+            next++;
+                    
+            if( next < numLines ) {
+                sparseCommaLineToBoolArray( "useVanishIndex", 
+                                            lines[next],
+                                            r->spriteUseVanish, 
+                                            r->numSprites );
+                next++;
+
+                if( next < numLines ) {
+                    sparseCommaLineToBoolArray( "useAppearIndex", 
+                                                lines[next],
+                                                r->spriteUseAppear, 
+                                                r->numSprites );
+                    next++;
+                    }
+                }
+            }
+                
+        if( next < numLines ) {
+            sscanf( lines[next], "pixHeight=%d", 
+                    &( r->cachedHeight ) );
+            next++;
+            }       
+                
+        r->toolSetIndex = -1;
+                
+        r->isBiomeLimited = false;
+        r->permittedBiomeMap = NULL;
+        }
+                            
+    for( int i=0; i<numLines; i++ ) {
+        delete [] lines[i];
+        }
+    delete [] lines;
+            
+    return r;
+    }
+
+
+
+
+
+
+
 float initObjectBankStep() {
         
     if( currentFile == cache.numFiles ) {
@@ -1044,808 +1843,50 @@ float initObjectBankStep() {
         char *objectText = getFileContents( cache, i );
         
         if( objectText != NULL ) {
-            int numLines;
-                        
-            char **lines = split( objectText, "\n", &numLines );
-                        
+            ObjectRecord *r = scanObjectRecordFromString( objectText );
+            
             delete [] objectText;
 
-            if( numLines >= 14 ) {
-                ObjectRecord *r = new ObjectRecord;
-                            
-                int next = 0;
-                
-                r->id = 0;
-                sscanf( lines[next], "id=%d", 
-                        &( r->id ) );
-                
-                if( r->id > maxID ) {
-                    maxID = r->id;
-                    }
-                
-                next++;
-                            
-                r->description = stringDuplicate( lines[next] );
-                         
-
-                setupObjectWritingStatus( r );
-                
-                setupObjectGlobalTriggers( r );
-                
-                setupObjectSpeechPipe( r );
-                
-                setupFlight( r );
-                
-                setupOwned( r );
-                
-                setupNoHighlight( r );
-                
-                setupMaxPickupAge( r );
-                
-                setupAutoDefaultTrans( r );
-                
-                setupNoBackAccess( r );                
-
-                setupAlcohol( r );
-                
-                setupFamHomeland( r );
-                
-                setupForcedBiome( r );
-                
-                setupExpertFind( r );
-
-                setupNormalOnly( r );
-
-                setupYumParent( r );
-                
-                setupRoadParent( r );
-                
-                setupSlotsInvis( r );
-                
-                setupVarSerialNumber( r );
-
-                setupVarIsNumeral( r );
-
-
-                // do this later, after we parse floorHugging
-                // setupWall( r );
-                
-
-                r->isAutoOrienting = false;
-                r->causeAutoOrientHOnly = false;
-                r->causeAutoOrientVOnly = false;
-                r->horizontalVersionID = -1;
-                r->verticalVersionID = -1;
-                r->cornerVersionID = -1;
-
-                next++;
-                            
-                int contRead = 0;                            
-                sscanf( lines[next], "containable=%d", 
-                        &( contRead ) );
-                            
-                r->containable = contRead;
-                            
-                next++;
-                    
-                r->containSize = 1;
-                r->vertContainRotationOffset = 0;
-                
-                sscanf( lines[next], "containSize=%f,vertSlotRot=%lf", 
-                        &( r->containSize ),
-                        &( r->vertContainRotationOffset ) );
-                            
-                next++;
-                            
-                int permRead = 0;                 
-                r->minPickupAge = 3;
-                sscanf( lines[next], "permanent=%d,minPickupAge=%d", 
-                        &( permRead ),
-                        &( r->minPickupAge ) );
-                            
-                r->permanent = permRead;
-
-                next++;
-
-
-
-                r->noFlip = false;
-
-                if( strstr( lines[next], "noFlip=" ) != NULL ) {
-                    int noFlipRead = 0;
-                    
-                    sscanf( lines[next], "noFlip=%d", 
-                        &( noFlipRead ) );
-                            
-                    r->noFlip = noFlipRead;
-
-                    next++;
-                    }
-
-                r->sideAccess = false;
-
-                if( strstr( lines[next], "sideAccess=" ) != NULL ) {
-                    int sideAccessRead = 0;
-                    
-                    sscanf( lines[next], "sideAccess=%d", 
-                        &( sideAccessRead ) );
-                            
-                    r->sideAccess = sideAccessRead;
-
-                    next++;
-                    }
-                
-
-
-
-                int heldInHandRead = 0;                            
-                sscanf( lines[next], "heldInHand=%d", 
-                        &( heldInHandRead ) );
-                          
-                r->heldInHand = false;
-                r->rideable = false;
-                
-                if( heldInHandRead == 1 ) {
-                    r->heldInHand = true;
-                    }
-                else if( heldInHandRead == 2 ) {
-                    r->rideable = true;
-                    }
-
-                next++;
-
-
-                int blocksWalkingRead = 0;                            
-                
-                r->leftBlockingRadius = 0;
-                r->rightBlockingRadius = 0;
-                
-                int drawBehindPlayerRead = 0;
-                
-                sscanf( lines[next], 
-                        "blocksWalking=%d,"
-                        "leftBlockingRadius=%d,rightBlockingRadius=%d,"
-                        "drawBehindPlayer=%d",
-                        &( blocksWalkingRead ),
-                        &( r->leftBlockingRadius ),
-                        &( r->rightBlockingRadius ),
-                        &( drawBehindPlayerRead ) );
-                            
-                r->blocksWalking = blocksWalkingRead;
-                r->drawBehindPlayer = drawBehindPlayerRead;
-                
-                r->wide = ( r->leftBlockingRadius > 0 || 
-                            r->rightBlockingRadius > 0 );
-
-                if( r->wide ) {
-                    r->drawBehindPlayer = true;
-                    
-                    if( r->leftBlockingRadius > maxWideRadius ) {
-                        maxWideRadius = r->leftBlockingRadius;
-                        }
-                    if( r->rightBlockingRadius > maxWideRadius ) {
-                        maxWideRadius = r->rightBlockingRadius;
-                        }
-                    }
-                    
-
-                next++;
-
-                
-                setupBlocksMoving( r );
-                setupBlocksNonFollower( r );
-                setupBadgePos( r );
-                setupHideHead( r );
-                setupHideBody( r );
-                setupHideRider( r );
-                setupNeverDrop( r );
-                setupGiveClue( r );
-                setupNearPop( r );
-                setupContainOffset( r );
-                
-                
-                r->mapChance = 0;      
-                char biomeString[200];
-                int numRead = sscanf( lines[next], 
-                                      "mapChance=%f#biomes_%199s", 
-                                      &( r->mapChance ), biomeString );
-                
-                if( numRead != 2 ) {
-                    // biome not present (old format), treat as 0
-                    biomeString[0] = '0';
-                    biomeString[1] = '\0';
-                    
-                    sscanf( lines[next], "mapChance=%f", &( r->mapChance ) );
-                
-                    // NOTE:  I've avoided too many of these format
-                    // bandaids, and forced whole-folder file rewrites 
-                    // in the past.
-                    // But now we're part way into production, so bandaids
-                    // are more effective.
-                    }
-                
-                fillObjectBiomeFromString( r, biomeString );
-
-                next++;
-
-
-                r->heatValue = 0;                            
-                sscanf( lines[next], "heatValue=%d", 
-                        &( r->heatValue ) );
-                            
-                next++;
-
-                            
-
-                r->rValue = 0;                            
-                sscanf( lines[next], "rValue=%f", 
-                        &( r->rValue ) );
-                            
-                next++;
-
-
-
-                int personRead = 0;                            
-                int noSpawnRead = 0;
-                sscanf( lines[next], "person=%d,noSpawn=%d", 
-                        &personRead, &noSpawnRead );
-                            
-                r->person = ( personRead > 0 );
-                
-                r->race = personRead;
-                
-                r->personNoSpawn = noSpawnRead;
-
-                next++;
-
-
-                int maleRead = 0;                            
-                sscanf( lines[next], "male=%d", 
-                        &( maleRead ) );
-                    
-                r->male = maleRead;
-                            
-                next++;
-
-
-                int deathMarkerRead = 0;     
-                sscanf( lines[next], "deathMarker=%d", 
-                        &( deathMarkerRead ) );
-                    
-                r->deathMarker = deathMarkerRead;
-                
-                if( r->deathMarker ) {
-                    deathMarkerObjectIDs.push_back( r->id );
-                    }
-
-                next++;
-
-                
-                if( strstr( r->description, "fromDeath" ) != NULL ) {
-                    allPossibleDeathMarkerIDs.push_back( r->id );
-                    }
-                
-
-                r->homeMarker = false;
-                
-                if( strstr( lines[next], "homeMarker=" ) != NULL ) {
-                    // home marker flag present
-                    
-                    int homeMarkerRead = 0;
-                    sscanf( lines[next], "homeMarker=%d", &( homeMarkerRead ) );
-                    
-                    r->homeMarker = homeMarkerRead;
-                    
-                    next++;
-                    }
-
-
-
-                r->floor = false;
-                
-                if( strstr( lines[next], "floor=" ) != NULL ) {
-                    // floor flag present
-                    
-                    int floorRead = 0;
-                    sscanf( lines[next], "floor=%d", &( floorRead ) );
-                    
-                    r->floor = floorRead;
-                    
-                    next++;
-                    }
-
-
-                r->floorHugging = false;
-                
-                if( strstr( lines[next], "floorHugging=" ) != NULL ) {
-                    // floorHugging flag present
-                    
-                    int hugRead = 0;
-                    sscanf( lines[next], "floorHugging=%d", &( hugRead ) );
-                    
-                    r->floorHugging = hugRead;
-                    
-                    next++;
-                    }
-
-
-                setupWall( r );
-
-                            
-                sscanf( lines[next], "foodValue=%d", 
-                        &( r->foodValue ) );
-                
-                if( r->foodValue > maxFoodValue ) {
-                    maxFoodValue = r->foodValue;
-                    }
-                
-                if( r->foodValue > 0 ) {
-                    allPossibleFoodIDs.push_back( r->id );
-                    }
-
-                next++;
-                            
-                            
-                            
-                sscanf( lines[next], "speedMult=%f", 
-                        &( r->speedMult ) );
-                            
-                next++;
-
-
-
-                r->heldOffset.x = 0;
-                r->heldOffset.y = 0;
-                            
-                sscanf( lines[next], "heldOffset=%lf,%lf", 
-                        &( r->heldOffset.x ),
-                        &( r->heldOffset.y ) );
-                            
-                next++;
-
-
-
-                r->clothing = 'n';
-                            
-                sscanf( lines[next], "clothing=%c", 
-                        &( r->clothing ));
-                            
-                next++;
-                            
-                            
-                            
-                r->clothingOffset.x = 0;
-                r->clothingOffset.y = 0;
-                            
-                sscanf( lines[next], "clothingOffset=%lf,%lf", 
-                        &( r->clothingOffset.x ),
-                        &( r->clothingOffset.y ) );
-                            
-                next++;
-                            
-                    
-                r->deadlyDistance = 0;
-                sscanf( lines[next], "deadlyDistance=%d", 
-                        &( r->deadlyDistance ) );
-                            
-                next++;
-                
-                
-                r->useDistance = 1;
-                
-                if( strstr( lines[next], 
-                            "useDistance=" ) != NULL ) {
-                    // use distance present
-                    
-                    sscanf( lines[next], "useDistance=%d", 
-                            &( r->useDistance ) );
-                    
-                    next++;
-                    }
-                
-
-                r->creationSound = blankSoundUsage;
-                r->usingSound = blankSoundUsage;
-                r->eatingSound = blankSoundUsage;
-                r->decaySound = blankSoundUsage;
-                
-                
-                if( strstr( lines[next], "sounds=" ) != NULL ) {
-                    // sounds present
-
-                    int numParts = 0;
-                    
-                    char **parts = split( &( lines[next][7] ), ",", &numParts );
-                    
-                    if( numParts == 4 ) {
-                        r->creationSound = scanSoundUsage( parts[0] );
-                        r->usingSound = scanSoundUsage( parts[1] );
-                        r->eatingSound = scanSoundUsage( parts[2] );
-                        r->decaySound = scanSoundUsage( parts[3] );
-                        }
-                    
-                    for( int i=0; i<numParts; i++ ) {
-                        delete [] parts[i];
-                        }
-                    delete [] parts;
-
-                    next++;
-                    }
-                
-                if( strstr( lines[next], 
-                            "creationSoundInitialOnly=" ) != NULL ) {
-                    // flag present
-                    
-                    int flagRead = 0;                            
-                    sscanf( lines[next], "creationSoundInitialOnly=%d", 
-                            &( flagRead ) );
-                    
-                    r->creationSoundInitialOnly = flagRead;
-                            
-                    next++;
-                    }
-                else {
-                    r->creationSoundInitialOnly = 0;
-                    }
-                
-                if( strstr( lines[next], 
-                            "creationSoundForce=" ) != NULL ) {
-                    // flag present
-                    
-                    int flagRead = 0;                            
-                    sscanf( lines[next], "creationSoundForce=%d", 
-                            &( flagRead ) );
-                    
-                    r->creationSoundForce = flagRead;
-                            
-                    next++;
-                    }
-                else {
-                    r->creationSoundForce = 0;
-                    }
-
-
-                r->numSlots = 0;
-                r->slotTimeStretch = 1.0f;
-                
-                
-                if( strstr( lines[next], "#" ) != NULL ) {
-                    sscanf( lines[next], "numSlots=%d#timeStretch=%f", 
-                            &( r->numSlots ),
-                            &( r->slotTimeStretch ) );
-                    }
-                else {
-                    sscanf( lines[next], "numSlots=%d", 
-                            &( r->numSlots ) );
-                    }
-                
-
-                next++;
-
-                r->slotSize = 1;
-                sscanf( lines[next], "slotSize=%f", 
-                        &( r->slotSize ) );
-                            
-                next++;
-
-                r->slotsLocked = 0;
-                if( strstr( lines[next], 
-                            "slotsLocked=" ) != NULL ) {
-                    // flag present
-                    
-                    int flagRead = 0;                            
-                    sscanf( lines[next], "slotsLocked=%d", 
-                            &( flagRead ) );
-                    
-                    r->slotsLocked = flagRead;
-                            
-                    next++;
-                    }
-                
-                
-                r->slotPos = new doublePair[ r->numSlots ];
-                r->slotVert = new char[ r->numSlots ];
-                r->slotParent = new int[ r->numSlots ];
+            if( r->id > maxID ) {
+                maxID = r->id;
+                }
             
-                for( int i=0; i< r->numSlots; i++ ) {
-                    r->slotVert[i] = false;
-                    r->slotParent[i] = -1;
+            setupObjectSpeechPipe( r );
+
+            if( r->deathMarker ) {
+                deathMarkerObjectIDs.push_back( r->id );
+                }
+
+            if( strstr( r->description, "fromDeath" ) != NULL ) {
+                allPossibleDeathMarkerIDs.push_back( r->id );
+                }
+                
+            if( r->foodValue > 0 ) {
+                allPossibleFoodIDs.push_back( r->id );
+                }
+
+            if( strstr( r->description, "monumentCall" ) != NULL ) {
+                monumentCallObjectIDs.push_back( r->id );
+                }
                     
-                    int vertRead = 0;
-                    sscanf( lines[ next ], "slotPos=%lf,%lf,vert=%d,parent=%d", 
-                            &( r->slotPos[i].x ),
-                            &( r->slotPos[i].y ),
-                            &vertRead,
-                            &( r->slotParent[i] ) );
-                    r->slotVert[i] = vertRead;
-                    next++;
-                    }
-                            
 
-                r->numSprites = 0;
-                sscanf( lines[next], "numSprites=%d", 
-                        &( r->numSprites ) );
-                            
-                next++;
-
-                r->sprites = new int[r->numSprites];
-                r->spritePos = new doublePair[ r->numSprites ];
-                r->spriteRot = new double[ r->numSprites ];
-                r->spriteHFlip = new char[ r->numSprites ];
-                r->spriteColor = new FloatRGB[ r->numSprites ];
-                    
-                r->spriteAgeStart = new double[ r->numSprites ];
-                r->spriteAgeEnd = new double[ r->numSprites ];
-
-                r->spriteParent = new int[ r->numSprites ];
-                r->spriteInvisibleWhenHolding = new char[ r->numSprites ];
-                r->spriteInvisibleWhenWorn = new int[ r->numSprites ];
-                r->spriteBehindSlots = new char[ r->numSprites ];
-                r->spriteInvisibleWhenContained = new char[ r->numSprites ];
-
-
-                r->spriteIsHead = new char[ r->numSprites ];
-                r->spriteIsBody = new char[ r->numSprites ];
-                r->spriteIsBackFoot = new char[ r->numSprites ];
-                r->spriteIsFrontFoot = new char[ r->numSprites ];
+            if( r->person && ! r->personNoSpawn ) {
+                personObjectIDs.push_back( r->id );
                 
-
-                memset( r->spriteIsHead, false, r->numSprites );
-                memset( r->spriteIsBody, false, r->numSprites );
-                memset( r->spriteIsBackFoot, false, r->numSprites );
-                memset( r->spriteIsFrontFoot, false, r->numSprites );
-                
-                
-                r->numUses = 1;
-                r->useChance = 1.0f;
-                
-                r->spriteUseVanish = new char[ r->numSprites ];
-                r->spriteUseAppear = new char[ r->numSprites ];
-                r->useDummyIDs = NULL;
-                r->isUseDummy = false;
-                r->useDummyParent = 0;
-                r->thisUseDummyIndex = -1;
-                
-                r->cachedHeight = -1;
-                
-                memset( r->spriteUseVanish, false, r->numSprites );
-                memset( r->spriteUseAppear, false, r->numSprites );
-
-                r->spriteSkipDrawing = new char[ r->numSprites ];
-                memset( r->spriteSkipDrawing, false, r->numSprites );
-                
-                r->apocalypseTrigger = false;
-                if( r->description[0] == 'T' &&
-                    r->description[1] == 'h' &&
-                    strstr( r->description, "The Apocalypse" ) == 
-                    r->description ) {
-                    
-                    printf( "Object id %d (%s) seen as an apocalypse trigger\n",
-                            r->id, r->description );
-
-                    r->apocalypseTrigger = true;
+                if( ! r->male ) {
+                    femalePersonObjectIDs.push_back( r->id );
                     }
 
-                r->monumentStep = false;
-                r->monumentDone = false;
-                r->monumentCall = false;
-                
-                if( strstr( r->description, "monument" ) != NULL ) {
-                    // some kind of monument state
-                    if( strstr( r->description, "monumentStep" ) != NULL ) {
-                        r->monumentStep = true;
-                        }
-                    else if( strstr( r->description, 
-                                     "monumentDone" ) != NULL ) {
-                        r->monumentDone = true;
-                        }
-                    else if( strstr( r->description, 
-                                     "monumentCall" ) != NULL ) {
-                        r->monumentCall = true;
-                        monumentCallObjectIDs.push_back( r->id );
-                        }
+                if( r->race <= MAX_RACE ) {
+                    racePersonObjectIDs[ r->race ].push_back( r->id );
                     }
-                
-                r->numVariableDummyIDs = 0;
-                r->variableDummyIDs = NULL;
-                r->isVariableDummy = false;
-                r->variableDummyParent = 0;
-                r->thisVariableDummyIndex = -1;
-                r->isVariableHidden = false;
-                
-
-                for( int i=0; i< r->numSprites; i++ ) {
-                    sscanf( lines[next], "spriteID=%d", 
-                            &( r->sprites[i] ) );
-                                
-                    next++;
-                                
-                    sscanf( lines[next], "pos=%lf,%lf", 
-                            &( r->spritePos[i].x ),
-                            &( r->spritePos[i].y ) );
-                                
-                    next++;
-                                
-                    sscanf( lines[next], "rot=%lf", 
-                            &( r->spriteRot[i] ) );
-                                
-                    next++;
-                                
-                        
-                    int flipRead = 0;
-                                
-                    sscanf( lines[next], "hFlip=%d", &flipRead );
-                                
-                    r->spriteHFlip[i] = flipRead;
-                                
-                    next++;
-
-
-                    sscanf( lines[next], "color=%f,%f,%f", 
-                            &( r->spriteColor[i].r ),
-                            &( r->spriteColor[i].g ),
-                            &( r->spriteColor[i].b ) );
-                                
-                    next++;
-
-
-                    sscanf( lines[next], "ageRange=%lf,%lf", 
-                            &( r->spriteAgeStart[i] ),
-                            &( r->spriteAgeEnd[i] ) );
-                                
-                    next++;
-                        
-
-                    sscanf( lines[next], "parent=%d", 
-                            &( r->spriteParent[i] ) );
-                        
-                    next++;
-
-
-                    int invisRead = 0;
-                    int invisWornRead = 0;
-                    int behindSlotsRead = 0;
-                    
-                    sscanf( lines[next], 
-                            "invisHolding=%d,invisWorn=%d,behindSlots=%d", 
-                            &invisRead, &invisWornRead,
-                            &behindSlotsRead );
-                                
-                    r->spriteInvisibleWhenHolding[i] = invisRead;
-                    r->spriteInvisibleWhenWorn[i] = invisWornRead;
-                    r->spriteBehindSlots[i] = behindSlotsRead;
-                                
-                    next++;                       
-                    
-                    if( strstr( lines[next], "invisCont=" ) != NULL ) {
-                        invisRead = 0;
-                        sscanf( lines[next], "invisCont=%d", &invisRead );
-                        
-                        r->spriteInvisibleWhenContained[i] = invisRead;
-                        next++;
-                        }
-                    else {
-                        r->spriteInvisibleWhenContained[i] = 0;
-                        }
-                    }
-                
-
-                r->anySpritesBehindPlayer = false;
-                r->spriteBehindPlayer = NULL;
-
-                if( strstr( lines[next], "spritesDrawnBehind=" ) != NULL ) {
-                    r->anySpritesBehindPlayer = true;
-                    r->spriteBehindPlayer = new char[ r->numSprites ];
-                    memset( r->spriteBehindPlayer, false, r->numSprites );
-                    sparseCommaLineToBoolArray( "spritesDrawnBehind", 
-                                                lines[next],
-                                                r->spriteBehindPlayer, 
-                                                r->numSprites );
-                    next++;
-                    }
-                
-
-                r->spriteAdditiveBlend = NULL;
-
-                if( strstr( lines[next], "spritesAdditiveBlend=" ) != NULL ) {
-                    r->spriteAdditiveBlend = new char[ r->numSprites ];
-                    memset( r->spriteAdditiveBlend, false, r->numSprites );
-                    sparseCommaLineToBoolArray( "spritesAdditiveBlend", 
-                                                lines[next],
-                                                r->spriteAdditiveBlend, 
-                                                r->numSprites );
-                    next++;
-                    }
-
-                    
-                r->spriteNoFlipXPos = NULL;
-
-
-                sparseCommaLineToBoolArray( "headIndex", lines[next],
-                                            r->spriteIsHead, r->numSprites );
-                next++;
-
-
-                sparseCommaLineToBoolArray( "bodyIndex", lines[next],
-                                            r->spriteIsBody, r->numSprites );
-                next++;
-
-
-                sparseCommaLineToBoolArray( "backFootIndex", lines[next],
-                                            r->spriteIsBackFoot, 
-                                            r->numSprites );
-                next++;
-
-
-                sparseCommaLineToBoolArray( "frontFootIndex", lines[next],
-                                            r->spriteIsFrontFoot, 
-                                            r->numSprites );
-                next++;
-                
-                
-                setupEyesAndMouth( r );
-
-
-                if( next < numLines ) {
-                    // info about num uses and vanish/appear sprites
-                    
-                    sscanf( lines[next], "numUses=%d,%f", 
-                            &( r->numUses ),
-                            &( r->useChance ) );
-                            
-                    next++;
-                    
-                    if( next < numLines ) {
-                        sparseCommaLineToBoolArray( "useVanishIndex", 
-                                                    lines[next],
-                                                    r->spriteUseVanish, 
-                                                    r->numSprites );
-                        next++;
-
-                        if( next < numLines ) {
-                            sparseCommaLineToBoolArray( "useAppearIndex", 
-                                                        lines[next],
-                                                        r->spriteUseAppear, 
-                                                        r->numSprites );
-                            next++;
-                            }
-                        }
-                    }
-                
-                if( next < numLines ) {
-                    sscanf( lines[next], "pixHeight=%d", 
-                            &( r->cachedHeight ) );
-                    next++;
-                    }       
-                
-                r->toolSetIndex = -1;
-                
-                r->isBiomeLimited = false;
-                r->permittedBiomeMap = NULL;
-                    
-                records.push_back( r );
-
-                            
-                if( r->person && ! r->personNoSpawn ) {
-                    personObjectIDs.push_back( r->id );
-                    
-                    if( ! r->male ) {
-                        femalePersonObjectIDs.push_back( r->id );
-                        }
-
-                    if( r->race <= MAX_RACE ) {
-                        racePersonObjectIDs[ r->race ].push_back( r->id );
-                        }
-                    else {
-                        racePersonObjectIDs[ MAX_RACE ].push_back( r->id );
-                        }
+                else {
+                    racePersonObjectIDs[ MAX_RACE ].push_back( r->id );
                     }
                 }
-                            
-            for( int i=0; i<numLines; i++ ) {
-                delete [] lines[i];
-                }
-            delete [] lines;
+
+
+            records.push_back( r );
             }
         }
                 
@@ -2157,17 +2198,28 @@ void initObjectBankFinish() {
     int numRecords = records.size();
     for( int i=0; i<numRecords; i++ ) {
         ObjectRecord *r = records.getElementDirect(i);
-        
-        idMap[ r->id ] = r;
 
-        if( makeNewObjectsSearchable ) {    
-            char *lowercase = stringToLowerCase( r->description );
-
-            tree.insert( lowercase, r );
+        if( idMap[ r->id ] != NULL ) {
+            // our map already contains a record for this id
+            // maybe user messed up, manually editing object files
+            // and screwed up their IDs, leaving duplicate ids in different
+            // .txt files in the objects folder
             
-            delete [] lowercase;
+            // keep only the first one scanned for this id
+            
+            freeObjectRecord( r );
             }
-        
+        else {
+            idMap[ r->id ] = r;
+
+            if( makeNewObjectsSearchable ) {    
+                char *lowercase = stringToLowerCase( r->description );
+                
+                tree.insert( lowercase, r );
+                
+                delete [] lowercase;
+                }
+            }
         }
     
                         
@@ -3020,7 +3072,79 @@ void setupSpriteUseVis( ObjectRecord *inObject, int inUsesRemaining,
 
 
 
-static void freeObjectRecord( int inID ) {
+void freeObjectRecord( ObjectRecord *inObject ) {
+    delete [] inObject->description;
+    
+    delete [] inObject->biomes;
+            
+    delete [] inObject->slotPos;
+    delete [] inObject->slotVert;
+    delete [] inObject->slotParent;
+    delete [] inObject->sprites;
+    delete [] inObject->spritePos;
+    delete [] inObject->spriteRot;
+    delete [] inObject->spriteHFlip;
+    delete [] inObject->spriteColor;
+
+    delete [] inObject->spriteAgeStart;
+    delete [] inObject->spriteAgeEnd;
+    delete [] inObject->spriteParent;
+
+    delete [] inObject->spriteInvisibleWhenHolding;
+    delete [] inObject->spriteInvisibleWhenWorn;
+    delete [] inObject->spriteBehindSlots;
+    delete [] inObject->spriteInvisibleWhenContained;
+
+    delete [] inObject->spriteIsHead;
+    delete [] inObject->spriteIsBody;
+    delete [] inObject->spriteIsBackFoot;
+    delete [] inObject->spriteIsFrontFoot;
+
+    delete [] inObject->spriteIsEyes;
+    delete [] inObject->spriteIsMouth;
+
+    delete [] inObject->spriteUseVanish;
+    delete [] inObject->spriteUseAppear;
+            
+    if( inObject->useDummyIDs != NULL ) {
+        delete [] inObject->useDummyIDs;
+        }
+
+    if( inObject->variableDummyIDs != NULL ) {
+        delete [] inObject->variableDummyIDs;
+        }
+            
+    if( inObject->spriteBehindPlayer != NULL ) {
+        delete [] inObject->spriteBehindPlayer;
+        }
+
+    if( inObject->spriteAdditiveBlend != NULL ) {
+        delete [] inObject->spriteAdditiveBlend;
+        }
+
+    if( inObject->spriteNoFlipXPos != NULL ) {
+        delete [] inObject->spriteNoFlipXPos;
+        }
+            
+
+    delete [] inObject->spriteSkipDrawing;
+            
+    clearSoundUsage( &( inObject->creationSound ) );
+    clearSoundUsage( &( inObject->usingSound ) );
+    clearSoundUsage( &( inObject->eatingSound ) );
+    clearSoundUsage( &( inObject->decaySound ) );
+            
+    if( inObject->permittedBiomeMap != NULL ) {
+        delete [] inObject->permittedBiomeMap;
+        }
+
+    delete inObject;
+    }
+
+
+
+
+static void freeObjectBankRecord( int inID ) {
     if( inID < mapSize ) {
         if( idMap[inID] != NULL ) {
             
@@ -3031,73 +3155,9 @@ static void freeObjectRecord( int inID ) {
             delete [] lower;
             
             int race = idMap[inID]->race;
-
-            delete [] idMap[inID]->description;
             
-            delete [] idMap[inID]->biomes;
-            
-            delete [] idMap[inID]->slotPos;
-            delete [] idMap[inID]->slotVert;
-            delete [] idMap[inID]->slotParent;
-            delete [] idMap[inID]->sprites;
-            delete [] idMap[inID]->spritePos;
-            delete [] idMap[inID]->spriteRot;
-            delete [] idMap[inID]->spriteHFlip;
-            delete [] idMap[inID]->spriteColor;
+            freeObjectRecord( idMap[inID] );
 
-            delete [] idMap[inID]->spriteAgeStart;
-            delete [] idMap[inID]->spriteAgeEnd;
-            delete [] idMap[inID]->spriteParent;
-
-            delete [] idMap[inID]->spriteInvisibleWhenHolding;
-            delete [] idMap[inID]->spriteInvisibleWhenWorn;
-            delete [] idMap[inID]->spriteBehindSlots;
-            delete [] idMap[inID]->spriteInvisibleWhenContained;
-
-            delete [] idMap[inID]->spriteIsHead;
-            delete [] idMap[inID]->spriteIsBody;
-            delete [] idMap[inID]->spriteIsBackFoot;
-            delete [] idMap[inID]->spriteIsFrontFoot;
-
-            delete [] idMap[inID]->spriteIsEyes;
-            delete [] idMap[inID]->spriteIsMouth;
-
-            delete [] idMap[inID]->spriteUseVanish;
-            delete [] idMap[inID]->spriteUseAppear;
-            
-            if( idMap[inID]->useDummyIDs != NULL ) {
-                delete [] idMap[inID]->useDummyIDs;
-                }
-
-            if( idMap[inID]->variableDummyIDs != NULL ) {
-                delete [] idMap[inID]->variableDummyIDs;
-                }
-            
-            if( idMap[inID]->spriteBehindPlayer != NULL ) {
-                delete [] idMap[inID]->spriteBehindPlayer;
-                }
-
-            if( idMap[inID]->spriteAdditiveBlend != NULL ) {
-                delete [] idMap[inID]->spriteAdditiveBlend;
-                }
-
-            if( idMap[inID]->spriteNoFlipXPos != NULL ) {
-                delete [] idMap[inID]->spriteNoFlipXPos;
-                }
-            
-
-            delete [] idMap[inID]->spriteSkipDrawing;
-            
-            clearSoundUsage( &( idMap[inID]->creationSound ) );
-            clearSoundUsage( &( idMap[inID]->usingSound ) );
-            clearSoundUsage( &( idMap[inID]->eatingSound ) );
-            clearSoundUsage( &( idMap[inID]->decaySound ) );
-            
-            if( idMap[inID]->permittedBiomeMap != NULL ) {
-                delete [] idMap[inID]->permittedBiomeMap;
-                }
-
-            delete idMap[inID];
             idMap[inID] = NULL;
 
             personObjectIDs.deleteElementEqualTo( inID );
@@ -3125,74 +3185,7 @@ static void freeObjectRecord( int inID ) {
 void freeObjectBank() {
     for( int i=0; i<mapSize; i++ ) {
         if( idMap[i] != NULL ) {
-            
-            delete [] idMap[i]->slotPos;
-            delete [] idMap[i]->slotVert;
-            delete [] idMap[i]->slotParent;
-            delete [] idMap[i]->description;
-            delete [] idMap[i]->biomes;
-            
-            delete [] idMap[i]->sprites;
-            delete [] idMap[i]->spritePos;
-            delete [] idMap[i]->spriteRot;
-            delete [] idMap[i]->spriteHFlip;
-            delete [] idMap[i]->spriteColor;
-
-            delete [] idMap[i]->spriteAgeStart;
-            delete [] idMap[i]->spriteAgeEnd;
-            delete [] idMap[i]->spriteParent;
-
-            delete [] idMap[i]->spriteInvisibleWhenHolding;
-            delete [] idMap[i]->spriteInvisibleWhenWorn;
-            delete [] idMap[i]->spriteBehindSlots;
-            delete [] idMap[i]->spriteInvisibleWhenContained;
-
-            delete [] idMap[i]->spriteIsHead;
-            delete [] idMap[i]->spriteIsBody;
-            delete [] idMap[i]->spriteIsBackFoot;
-            delete [] idMap[i]->spriteIsFrontFoot;
-
-            delete [] idMap[i]->spriteIsEyes;
-            delete [] idMap[i]->spriteIsMouth;
-
-
-            delete [] idMap[i]->spriteUseVanish;
-            delete [] idMap[i]->spriteUseAppear;
-            
-            if( idMap[i]->useDummyIDs != NULL ) {
-                delete [] idMap[i]->useDummyIDs;
-                }
-
-            if( idMap[i]->variableDummyIDs != NULL ) {
-                delete [] idMap[i]->variableDummyIDs;
-                }
-            
-            if( idMap[i]->spriteBehindPlayer != NULL ) {
-                delete [] idMap[i]->spriteBehindPlayer;
-                }
-
-            if( idMap[i]->spriteAdditiveBlend != NULL ) {
-                delete [] idMap[i]->spriteAdditiveBlend;
-                }
-            
-            if( idMap[i]->spriteNoFlipXPos != NULL ) {
-                delete [] idMap[i]->spriteNoFlipXPos;
-                }
-            
-
-            delete [] idMap[i]->spriteSkipDrawing;
-
-            //printf( "\n\nClearing sound usage for id %d\n", i );            
-            clearSoundUsage( &( idMap[i]->creationSound ) );
-            clearSoundUsage( &( idMap[i]->usingSound ) );
-            clearSoundUsage( &( idMap[i]->eatingSound ) );
-            clearSoundUsage( &( idMap[i]->decaySound ) );
-
-            if( idMap[i]->permittedBiomeMap != NULL ) {
-                delete [] idMap[i]->permittedBiomeMap;
-                }
-
-            delete idMap[i];
+            freeObjectRecord( idMap[i] );
             }
         }
 
@@ -3358,6 +3351,10 @@ void resaveAll() {
 
 
 ObjectRecord *getObject( int inID, char inNoDefault ) {
+    if( inID == -1 ) {
+        return NULL;
+        }
+    
     inID = extractObjectID( inID );
     
     if( inID < mapSize ) {
@@ -4319,7 +4316,7 @@ int addObject( const char *inDescription,
     
     
     
-    freeObjectRecord( newID );
+    freeObjectBankRecord( newID );
     
     idMap[newID] = r;
     
@@ -4395,13 +4392,17 @@ HoldingPos drawObject( ObjectRecord *inObject, int inDrawBehindSlots,
                        ClothingSet inClothing,
                        double inScale ) {
 
+    HoldingPos returnHoldingPos = { false, {0, 0}, 0 };
+    
+    if( inObject == NULL ) {
+        return returnHoldingPos;
+        }
+
     checkDrawPos( inObject->id, inPos );
     
     if( inObject->noFlip ) {
         inFlipH = false;
         }
-
-    HoldingPos returnHoldingPos = { false, {0, 0}, 0 };
     
     SimpleVector <int> frontArmIndices;
     getFrontArmIndices( inObject, inAge, &frontArmIndices );
@@ -4822,6 +4823,15 @@ HoldingPos drawObject( ObjectRecord *inObject, doublePair inPos, double inRot,
                 inHideAllLimbs,
                 inHeldNotInPlaceYet,
                 inClothing );
+    
+    if( inObject == NULL ) {
+        return drawObject( inObject, 1, inPos, inRot, inWorn, inFlipH, inAge, 
+                           inHideClosestArm,
+                           inHideAllLimbs,
+                           inHeldNotInPlaceYet,
+                           inClothing );
+        }
+    
 
     char allBehind = true;
     for( int i=0; i< inObject->numSprites; i++ ) {
@@ -5010,7 +5020,7 @@ void deleteObjectFromBank( int inID ) {
         delete objectFile;
         }
 
-    freeObjectRecord( inID );
+    freeObjectBankRecord( inID );
     }
 
 
@@ -5547,6 +5557,13 @@ double getClosestObjectPart( ObjectRecord *inObject,
     *outClothing = -1;
     *outSlot = -1;
 
+    double smallestDist = 9999999;
+
+    if( inObject == NULL ) {
+        return smallestDist;
+        }
+    
+
     doublePair headPos = {0,0};
 
     int headIndex = getHeadIndex( inObject, inAge );
@@ -5865,7 +5882,6 @@ double getClosestObjectPart( ObjectRecord *inObject,
         }
     
     
-    double smallestDist = 9999999;
 
     char closestBehindSlots = false;
     
@@ -7183,3 +7199,331 @@ int getNextVarSerialNumberChild( ObjectRecord *inO ) {
     return parent->variableDummyIDs[ nextDummyIndex ];
     }
 
+
+
+static void copySpriteInts( int numSprites, 
+                            int **inOutTarget, int *inSource ) {
+    delete [] ( *inOutTarget );
+    
+    *inOutTarget = NULL;
+    
+    if( inSource == NULL ) {
+        return;
+        }
+
+    *inOutTarget = new int[ numSprites ];
+
+    memcpy( *inOutTarget, inSource, sizeof(int) * numSprites );
+    }
+
+
+
+static void copySpriteDoubles( int numSprites, 
+                               double **inOutTarget, double *inSource ) {
+    delete [] ( *inOutTarget );
+
+    *inOutTarget = NULL;
+    
+    if( inSource == NULL ) {
+        return;
+        }
+    
+    *inOutTarget = new double[ numSprites ];
+
+    memcpy( *inOutTarget, inSource, sizeof(double) * numSprites );
+    }
+
+
+
+static void copySpriteDoublePairs( int numSprites, 
+                                   doublePair **inOutTarget, 
+                                   doublePair *inSource ) {
+    delete [] ( *inOutTarget );
+    
+    *inOutTarget = NULL;
+    
+    if( inSource == NULL ) {
+        return;
+        }
+
+    *inOutTarget = new doublePair[ numSprites ];
+
+    memcpy( *inOutTarget, inSource, sizeof(doublePair) * numSprites );
+    }
+
+
+
+static void copySpriteFloatRGBs( int numSprites, 
+                                 FloatRGB **inOutTarget, FloatRGB *inSource ) {
+    delete [] ( *inOutTarget );
+
+    *inOutTarget = NULL;
+    
+    if( inSource == NULL ) {
+        return;
+        }
+
+    *inOutTarget = new FloatRGB[ numSprites ];
+
+    memcpy( *inOutTarget, inSource, sizeof(FloatRGB) * numSprites );
+    }
+
+
+
+static void copySpriteChars( int numSprites, 
+                             char **inOutTarget, char *inSource ) {
+    delete [] ( *inOutTarget );
+
+    *inOutTarget = NULL;
+    
+    if( inSource == NULL ) {
+        return;
+        }
+
+    *inOutTarget = new char[ numSprites ];
+
+    memcpy( *inOutTarget, inSource, sizeof(char) * numSprites );
+    }
+
+
+
+void copyObjectAppearance( int inTargetID, ObjectRecord *inSourceObject ) {
+    ObjectRecord *s = inSourceObject;
+    
+    ObjectRecord *t = getObject( inTargetID, true );
+    
+    if( t == NULL ) {
+        return;
+        }
+
+    t->vertContainRotationOffset = s->vertContainRotationOffset;
+
+    t->noFlip = s->noFlip;
+    
+    if( ! t->rideable ) {
+        // don't override handheld positioning if base object rideable
+        t->heldInHand = s->heldInHand;
+        }
+    
+    
+    int numSprites = s->numSprites; 
+
+    t->numSprites = numSprites;
+
+    t->anySpritesBehindPlayer = s->anySpritesBehindPlayer;
+    
+    copySpriteChars( numSprites,
+                     & t->spriteBehindPlayer,
+                     s->spriteBehindPlayer );
+
+    copySpriteChars( numSprites,
+                     & t->spriteAdditiveBlend,
+                     s->spriteAdditiveBlend );
+
+    t->wallLayer = s->wallLayer;
+    
+    t->frontWall = s->frontWall;
+    
+    t->heldOffset = s->heldOffset;
+    
+    t->clothingOffset = s->clothingOffset;
+    
+    clearSoundUsage( & t->creationSound );
+    clearSoundUsage( & t->usingSound );
+    clearSoundUsage( & t->eatingSound );
+    clearSoundUsage( & t->decaySound );
+    
+    t->creationSound = copyUsage( s->creationSound );
+    t->usingSound = copyUsage( s->usingSound );
+    t->eatingSound = copyUsage( s->eatingSound );
+    t->decaySound = copyUsage( s->decaySound );
+    
+    // num slots can't be changed by a mod, but
+    // copy slot attributes from mod
+    for( int i=0; i< t->numSlots; i++ ) {
+        if( s->numSlots > i ) {
+            t->slotPos[i] = s->slotPos[i];
+            t->slotVert[i] = s->slotVert[i];
+            
+            if( s->slotParent[i] < numSprites ) {
+                t->slotParent[i] = s->slotParent[i];
+                }
+            else {
+                t->slotParent[i] = -1;
+                }
+            }
+        else {
+            // mod specifies fewer slots
+            // leave target positions and verts alone
+            // but we don't know what sprite parent our slot should follow now
+            t->slotParent[i] = -1;
+            }
+        }
+    
+
+    copySpriteInts( numSprites,
+                    & t->sprites,
+                    s->sprites );
+
+    copySpriteDoublePairs( numSprites,
+                           & t->spritePos,
+                           s->spritePos );
+    
+    copySpriteDoubles( numSprites,
+                       & t->spriteRot,
+                       s->spriteRot );
+
+    copySpriteChars( numSprites,
+                     & t->spriteHFlip,
+                     s->spriteHFlip );
+
+    copySpriteFloatRGBs( numSprites,
+                         & t->spriteColor,
+                         s->spriteColor );
+
+    copySpriteDoubles( numSprites,
+                       & t->spriteAgeStart,
+                       s->spriteAgeStart );
+
+    copySpriteDoubles( numSprites,
+                       & t->spriteAgeEnd,
+                       s->spriteAgeEnd );
+    
+    copySpriteInts( numSprites,
+                    & t->spriteParent,
+                    s->spriteParent );
+
+    copySpriteChars( numSprites,
+                     & t->spriteInvisibleWhenHolding,
+                     s->spriteInvisibleWhenHolding );    
+
+    copySpriteInts( numSprites,
+                     & t->spriteInvisibleWhenWorn,
+                     s->spriteInvisibleWhenWorn );
+
+    copySpriteChars( numSprites,
+                     & t->spriteBehindSlots,
+                     s->spriteBehindSlots );
+    
+    copySpriteChars( numSprites,
+                     & t->spriteInvisibleWhenContained,
+                     s->spriteInvisibleWhenContained );
+    
+    copySpriteChars( numSprites,
+                     & t->spriteIsHead,
+                     s->spriteIsHead );
+
+    copySpriteChars( numSprites,
+                     & t->spriteIsBody,
+                     s->spriteIsBody );
+
+    copySpriteChars( numSprites,
+                     & t->spriteIsBackFoot,
+                     s->spriteIsBackFoot );
+
+    copySpriteChars( numSprites,
+                     & t->spriteIsFrontFoot,
+                     s->spriteIsFrontFoot );
+    
+    copySpriteChars( numSprites,
+                     & t->spriteIsEyes,
+                     s->spriteIsEyes );
+
+    copySpriteChars( numSprites,
+                     & t->spriteIsMouth,
+                     s->spriteIsMouth );
+    
+    t->mainEyesOffset = s->mainEyesOffset;
+    
+    
+    copySpriteChars( numSprites,
+                     & t->spriteUseVanish,
+                     s->spriteUseVanish );
+    
+    copySpriteChars( numSprites,
+                     & t->spriteUseAppear,
+                     s->spriteUseAppear );
+
+    // copy this over, which should all be false,
+    // but copy it over to get its size correct
+    // in some cases, parent object of use dummies might have some sprites
+    // hidden, which we will capture here
+    copySpriteChars( numSprites,
+                     & t->spriteSkipDrawing,
+                     s->spriteSkipDrawing );
+    
+    
+    t->noCover = s->noCover;
+
+    t->slotsInvis = s->slotsInvis;
+
+    copySpriteDoubles( numSprites,
+                       & t->spriteNoFlipXPos,
+                       s->spriteNoFlipXPos );
+
+    t->hasBadgePos = s->hasBadgePos;
+    
+    t->badgePos = s->badgePos;
+    
+    t->hideHead = s->hideHead;
+    
+    t->hideBody = s->hideBody;
+
+    t->hideRider = s->hideRider;
+    
+    t->containOffsetX = s->containOffsetX;
+    
+    t->containOffsetY = s->containOffsetY;
+    
+    t->containOffsetBottomX = s->containOffsetBottomX;
+    
+    t->containOffsetBottomY = s->containOffsetBottomY;
+    
+    
+
+    // Clone appearance changes into all use dummies
+
+    if( t->numUses > 1 && t->useDummyIDs != NULL ) {
+        int numDummyObj = t->numUses - 1;
+        
+        
+        for( int s=0; s<t->numSprites; s++ ) {
+            if( t->spriteUseAppear[s] ) {
+                // hide all appearing sprites in parent object
+                t->spriteSkipDrawing[s] = true;
+                }
+            }
+                    
+        for( int d=1; d<=numDummyObj; d++ ) {
+            int dummyID = t->useDummyIDs[ d - 1 ];
+            
+            // copy changes that we made to target object into each dummy
+            copyObjectAppearance( dummyID, t );
+            
+            
+            ObjectRecord *dummyO = getObject( dummyID );
+                        
+            if( t->creationSoundInitialOnly && d != 1 ) {
+                // when we copied t appearance/sounds into dummy
+                // we might have added creation sounds to some dummies
+                // that shouldn't have one
+                clearSoundUsage( &( dummyO->creationSound ) );
+                }
+            
+                        
+            setupSpriteUseVis( t, d, dummyO->spriteSkipDrawing );
+            }
+        }
+    
+
+    // now variable dummies
+    if( t->variableDummyIDs != NULL ) {
+        for( int d=1; d <= t->numVariableDummyIDs; d++ ) {   
+            copyObjectAppearance( t->variableDummyIDs[ d - 1 ], t );
+            }
+        }
+    
+    // if either of these are NULL, we may be in the Editor where dummies
+    // aren't generated (game client generates them at runtime)
+
+    }
