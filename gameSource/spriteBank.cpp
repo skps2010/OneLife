@@ -14,6 +14,8 @@
 
 #include "minorGems/game/game.h"
 
+#include "minorGems/util/crc32.h"
+
 
 #include "folderCache.h"
 #include "binFolderCache.h"
@@ -46,6 +48,9 @@ static File spritesDir( NULL, "sprites" );
 
 
 static SpriteHandle blankSprite = NULL;
+
+
+static char doComputeSpriteHashes = false;
 
 
 
@@ -92,7 +97,10 @@ static char shouldFileBeCached( char *inFileName ) {
 
 
 
-int initSpriteBankStart( char *outRebuildingCache ) {
+int initSpriteBankStart( char *outRebuildingCache, 
+                         char inComputeSpriteHashes ) {
+    doComputeSpriteHashes = inComputeSpriteHashes;
+    
     maxID = 0;
     
     currentFile = 0;
@@ -333,7 +341,8 @@ float initSpriteBankStep() {
                 
                 
             char *contents = getFileContents( cache, i );
-                
+            
+            r->hash = 0;
             r->tag = NULL;
 
             r->centerXOffset = 0;
@@ -490,6 +499,11 @@ float initSpriteBankStep() {
                     
                         r->numStepsUnused = 0;
                         loadedSprites.push_back( spriteID );
+                        
+                        
+                        if( doComputeSpriteHashes ) {
+                            recomputeSpriteHash( r, contSize, contents );
+                            }
                         }
                     
                     delete [] contents;
@@ -1136,6 +1150,7 @@ int addSprite( const char *inTag, SpriteHandle inSprite,
     r->id = newID;
     r->sprite = inSprite;
     r->tag = stringDuplicate( inTag );
+    r->hash = 0;
     r->maxD = maxD;
     r->multiplicativeBlend = inMultiplicativeBlending;
     
@@ -1235,7 +1250,11 @@ int addSprite( const char *inTag, SpriteHandle inSprite,
 
     r->loading = false;
     r->numStepsUnused = 0;
-
+    
+    if( doComputeSpriteHashes ) {
+        recomputeSpriteHash( r );
+        }
+    
     return newID;
     }
 
@@ -1678,4 +1697,172 @@ char realSpriteBank() {
     }
 
 
+
+
+// returned array destroyed by caller
+static unsigned char *getSpriteTGAFileData( int inID,
+                                            int *outNumDataBytes ) {
+    File spritesDir( NULL, "sprites" );
+            
+
+    char *fileNameTGA = autoSprintf( "%d.tga", inID );
+        
+
+    File *spriteFile = spritesDir.getChildFile( fileNameTGA );
+    
+    delete [] fileNameTGA;
+    
+    unsigned char *tgaBytes = NULL;
+    
+    if( spriteFile->exists() ) {
+        tgaBytes = spriteFile->readFileContents( outNumDataBytes );
+        }
+    
+    delete spriteFile;
+
+    return tgaBytes;
+    }
+
+
+
+void recomputeSpriteHash( SpriteRecord *inRecord ) {
+    
+    int numTGABytes;
+    
+    unsigned char *tgaBytes = getSpriteTGAFileData( inRecord->id, 
+                                                    &numTGABytes );
+    
+    if( tgaBytes != NULL ) {
+
+        recomputeSpriteHash( inRecord, numTGABytes, tgaBytes );
+        
+        delete [] tgaBytes;
+        }
+    }
+
+
+
+void recomputeSpriteHash( SpriteRecord *inRecord,
+                          int inNumTGABytes,
+                          unsigned char *inTGAData ) {
+    
+    inRecord->hash = computeSpriteHash( inNumTGABytes,
+                                        inTGAData,
+                                        inRecord->tag,
+                                        inRecord->multiplicativeBlend,
+                                        inRecord->centerAnchorXOffset,
+                                        inRecord->centerAnchorYOffset );    
+    
+    }
+
+
+
+
+unsigned int computeSpriteHash(
+    int inNumTGABytes,
+    unsigned char *inTGAData,
+    char *inTag,
+    char inMultiplicativeBlend,
+    int inCenterAnchorXOffset, int inCenterAnchorYOffset ) {
+    
+    char *stringPortion = autoSprintf( "%s %d %d %d",
+                                       inTag, inMultiplicativeBlend,
+                                       inCenterAnchorXOffset,
+                                       inCenterAnchorYOffset );
+    int numStringBytes = strlen( stringPortion );
+    
+    int numTotalBytes = inNumTGABytes + numStringBytes;
+    
+    unsigned char *totalBytes = new unsigned char[ numTotalBytes ];
+    
+    memcpy( totalBytes, stringPortion, numStringBytes );
+    
+
+    if( inTGAData != NULL ) {
+        memcpy( &( totalBytes[numStringBytes] ), inTGAData, inNumTGABytes );
+        }
+    
+    // CRC is fine for this purpose
+    // If there is no CRC hit, we KNOW that the same sprite doesn't
+    // already exist.  However, if there is a CRC hit, we can
+    // check the actual data directly to make sure it's a match.
+
+    unsigned int hash = crc32( totalBytes, numTotalBytes );
+    
+    delete [] stringPortion;
+    delete [] totalBytes;
+    
+    return hash;
+    }
+
+
+
+int doesSpriteRecordExist(
+    int inNumTGABytes,
+    unsigned char *inTGAData,
+    char *inTag,
+    char inMultiplicativeBlend,
+    int inCenterAnchorXOffset, int inCenterAnchorYOffset ) {
+    
+    unsigned int targetHash = computeSpriteHash( inNumTGABytes,
+                                                 inTGAData,
+                                                 inTag,
+                                                 inMultiplicativeBlend,
+                                                 inCenterAnchorXOffset,
+                                                 inCenterAnchorYOffset );
+    
+    for( int i=0; i<mapSize; i++ ) {
+        if( idMap[i] != NULL ) {
+            SpriteRecord *r = idMap[i];
+            
+            if( r->hash != 0 && r->hash == targetHash ) {
+                
+                // a hit
+                
+                // make sure they are really equal
+                if( strcmp( inTag, r->tag ) != 0
+                    ||
+                    inMultiplicativeBlend != r->multiplicativeBlend
+                    ||
+                    inCenterAnchorXOffset != r->centerAnchorXOffset
+                    ||
+                    inCenterAnchorYOffset != r->centerAnchorYOffset ) {
+                    
+                    continue;
+                    }
+                
+                // metadata matches
+                
+                // check if file data matches
+                
+                int numTGABytes;
+    
+                unsigned char *tgaBytes = getSpriteTGAFileData( r->id, 
+                                                                &numTGABytes );
+    
+                char match = false;
+                
+                if( tgaBytes != NULL ) {
+                    
+                    if( numTGABytes == inNumTGABytes ) {
+                        
+                        if( memcmp( tgaBytes, inTGAData, numTGABytes ) == 0 ) {
+                            match = true;
+                            }
+                        }
+
+                    delete [] tgaBytes;
+                    }
+                
+                if( match ) {
+                    return r->id;
+                    }
+                }
+            
+            }
+        }
+    
+    // no match
+    return -1;
+    }
 

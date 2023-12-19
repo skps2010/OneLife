@@ -4,6 +4,69 @@ http://onehouronelife.com/updateLog.php
 
 
 
+Version ???
+
+--Fixed so that BELL and HELL arrow labels are in English.txt translation file
+  instead of hard-coded.
+
+--Fixed soundBank to roll back nextSoundNumber value whenever last sound in
+  bank is deleted, to avoid sound id inflation.
+
+--Fixed SoundWidget to uncount live use of old sound before saving new sound
+  when recording over a sound.  This further reduces sound id inflation.  Now,
+  if you record a bunch of sounds, with multiple overwriting takes for each
+  one, and then delete them all, the nextSoundNumber won't increase at all.
+
+
+
+Server Fixes:
+
+--Clearing new emotes list immediately after composing new emotes message,
+  instead of much later, so that emotes don't get added later, before clearing,
+  and then missed.  Fixes bug where some GH players don't get their permanent
+  emote assigned and sent properly.  Fixes #972
+
+--Fixed a busy-wait 100% cpu server bug caused by ghosts tripping the old age
+  timer and setting our poll timeout (via minMoveTime) to 0.
+
+--Slim chance of GH players.
+
+--Before, only a player's last SIDS-death mother would be remembered and
+  avoided.  If the player did /DIE repeatedly, this last SIDS mother would be
+  replaced, allowing them to revisit the same mother repeatedly over time,
+  which was annoying.  Now we maintin a full list of every mother for which a
+  given baby player has done /DIE, and we avoid those mothers as long as they
+  remain alive.  If the baby player runs out of mothers, they go to Donkeytown.
+  This will reduce the occurrence of SIDS generally, since players that are
+  doing this will skip mothers that they want to avoid after only one visit.
+  But also, it forces baby players to have some skin in the game.  If they SIDS
+  too much, they will run out of mothers and go to Donkeytown (temporarily,
+  until more mothers become available) instead of cycling through mothers
+  forever and annoying people.  Fixes #983
+
+--After using /DIE to cycle through mothers, and ending up in Donkeytown, your
+  SIDS list is cleared.  So your stay in Donkeytown is only temporary, and
+  after you die in Donkeytown, you can use /DIE to cycle back through mothers
+  again.  Fixes #985
+ 
+--On low-pop (< 8 players), /DIE-cycling players that run out of moms no longer
+  go to Donkeytown.  Their SIDS list is preserved, and they cycle through and
+  become Eve.  This permits classic solo play on low-pop servers.  Fixes #990
+
+--Fixed so that we force a girl baby if a family has no girl children currently
+  (in addition to the case where they have < 4 fertile/potential-fertile
+  females).  Fixes #991
+
+--Polylingual race now has no homeland, and can give birth in any homeland
+  band, though they must remain inside the bands (and still can't give birth in
+  the outlands to the far north or south).
+
+--New foodLogDetail, which gives time, player id, and object id for each food
+  eaten on the server.
+
+
+
+
 Version 399     2023-October-28
 
 --Support for new GH message.
