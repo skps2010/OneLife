@@ -68,7 +68,7 @@ CustomRandomSource randSource( 34957197 );
 
 
 
-
+#include "settingsToggle.h"
 
 #include "spriteBank.h"
 #include "objectBank.h"
@@ -381,6 +381,7 @@ static const char *customDataFormatReadString =
 
 
 char *getCustomRecordedGameData() {    
+    useMainSettings();
     
     updateDataVersionNumber();
 
@@ -458,6 +459,8 @@ void freeDrawString() {
 void initFrameDrawer( int inWidth, int inHeight, int inTargetFrameRate,
                       const char *inCustomRecordedGameData,
                       char inPlayingBack ) {
+    
+    useMainSettings();
 
     // it's always safe to call this, just in case we're launching post-update
     postUpdate();

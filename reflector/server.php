@@ -255,6 +255,11 @@ if( $handle ) {
 
                     if( $onlineNow ) {
                         $offline = 0;
+
+                        // re-read values from files, since tryServer
+                        // will update them
+                        $max = file_get_contents_safe( $maxFile );
+                        $current = file_get_contents_safe( $currentFile );
                         }
                     }
                 
@@ -311,6 +316,15 @@ if( $handle ) {
             // add another server for next time
             $curNumServers ++;
 
+            // print more logging info
+            $message = "Server populations:";
+            $i=0;
+            while( $i < $totalNumServer ) {
+                $message = $message . "\n$i pop = " . $currentPopPerServer[$i];
+                $i++;
+                }
+            logMessage( $message );
+            
             file_put_contents( $curNumServersFile, $curNumServers );
             // don't adjust $activeMaxCap this time
             }
@@ -332,6 +346,15 @@ if( $handle ) {
             // remove a server for next time
             $curNumServers --;
 
+            // print more logging info
+            $message = "Server populations:";
+            $i=0;
+            while( $i < $totalNumServer ) {
+                $message = $message . "\n$i pop = " . $currentPopPerServer[$i];
+                $i++;
+                }
+            logMessage( $message );
+            
             file_put_contents( $curNumServersFile, $curNumServers );
             // don't adjust $activeMaxCap this time
             }

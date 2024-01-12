@@ -4,6 +4,56 @@ http://onehouronelife.com/updateLog.php
 
 
 
+Version 407   ????
+
+--Editor now supports import_add and import_replace folders, for loading
+  exported OXZ files permanently into the local content data on disk.
+  Collaborators can now share content that they are working on with each other.
+
+--Editor pickers now accept raw ID numbers in search boxes, pulling up
+  object/sprite that matches that ID.
+
+--Editor pickers NEXT/PREV buttons now jump 25 on CTRL, 125 on SHIFT, and 625
+  on CTRL+SHIFT.  You can now page through all official OHOL items in 7 clicks,
+  where it used to be 35 clicks.  Part of #998
+
+--Editor Object pickers now allow you to search for field<=>value, like MapP>0
+  or person=1 or food>16.  Most of the fields and checkboxes from the Object
+  editor are supported by name.  Part of #998
+
+--Refactored Pickable.h code to use inItem instead of inObject to avoid
+  confusion (because Objects are only one type of pickable).
+
+--Editor Sprite pickers now allow field<=>value search, like solid=0 or
+  visibleW>200.  Part of #998
+
+--Tutorial text now explains forgiving instead of expiring curses.  Thanks
+  Spoonwood.  Fixes #1003
+
+
+
+
+Server Fixes:
+
+--Added new minActivePlayersForNearPop setting (defaults to 15) so that
+  nearPop-limited actions, like endtower base, can only happen on servers with
+  at least 15 players, preventing players from preparing an apocalypse on an
+  empty server, only to trigger it (which was already limited to a min of 15
+  players) during a population boom.  Fixes #1017
+
+--Added logging of server populations at moment where we decide to start
+  spreading or stop spreading.  Part of #1018
+
+--Reflector now re-reads current and max pop from a server's file after trying
+  to connect again to an offline server and succeeding.  This doesn't seem like
+  it will actually fix the problem described in #1018, but it's the correct
+  thing to do anyway.
+
+
+
+
+
+
 Version 406   2023-December-23
 
 --steamGateClient now handles uploading mods to Steam Workshop and
