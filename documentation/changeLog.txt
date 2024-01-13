@@ -4,7 +4,7 @@ http://onehouronelife.com/updateLog.php
 
 
 
-Version 408   2024-January-12
+Version 409   2024-January-13
 
 --Editor now supports import_add and import_replace folders, for loading
   exported OXZ files permanently into the local content data on disk.
@@ -38,6 +38,10 @@ Version 408   2024-January-12
   pushing binary builds.  Special cases in client/server code switch the
   SettingsManager temporarily to the contentSettings folder when loading these
   settings.  
+
+--Fixed to escape # signs in sprite tags when exporting sprites, and de-escape
+  them on import.  The # sign is the termination character of a data block in
+  the OXZ file format.  Fixes #1020
 
 
 
