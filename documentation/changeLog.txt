@@ -4,7 +4,7 @@ http://onehouronelife.com/updateLog.php
 
 
 
-Version 410   ???
+Version 412   2024-February-16
 
 --Support for AHAP differentiation with a text file in the game folder.  AHAP
   clients skip universal _all.dbz content diff bundles.
@@ -33,6 +33,10 @@ Version 410   ???
 
 --Authorship tagging in transition text files.
 
+--Authorship tagging for sprite files.  Also special handling of sprite
+  author=tag in export/import headers for sprites.
+
+
 
 
 Server Fixes:
@@ -51,6 +55,8 @@ Server Fixes:
 
 --Max flight distance disabled for now.  It's not so bad to have occasional
   flights to the Tutorial area or Donkeytown.
+
+--Added isAHAP.txt installation in remoteServerUpdate script.
 
 
 
