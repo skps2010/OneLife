@@ -149,12 +149,20 @@ SpriteRecord **searchSprites( const char *inSearch,
 
 // returns new ID, or -1 if adding failed
 // if inAuthorTag is NULL, author tag generated automatically from email setting
+//    UNLESS inNoAutoTag is true
+//
+// if inTGAFileData specified, that is written to disk
+// (so we don't re-format inSourceImage, which might not produce file-identical
+//  results to inTGAFileData)
 int addSprite( const char *inTag, SpriteHandle inSprite, 
                Image *inSourceImage,
                char inMultiplicativeBlending,
                int inCenterAnchorXOffset = 0,
                int inCenterAnchorYOffset = 0,
-               const char *inAuthorTag = NULL );
+               const char *inAuthorTag = NULL,
+               char inNoAutoTag = false,
+               unsigned char *inTGAFileData = NULL,
+               int inTGAFileLength = -1 );
 
 
 
@@ -165,7 +173,8 @@ int addSprite( const char *inTag,
                char inMultiplicativeBlending,
                int inCenterAnchorXOffset,
                int inCenterAnchorYOffset,
-               const char *inAuthorTag = NULL );
+               const char *inAuthorTag = NULL,
+               char inNoAutoTag = false );
 
 
 
