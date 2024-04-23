@@ -32,6 +32,8 @@ typedef struct SoundRecord {
         
 
         int liveUseageCount;
+
+        double lengthInSeconds;
         
     } SoundRecord;
 
@@ -116,6 +118,11 @@ void playSound( SoundSpriteHandle inSoundSprite,
 
 
 
+// gets length of a sound in bank
+double getSoundLengthInSeconds( int inID );
+
+
+
 
 // true if started
 char startRecordingSound();
@@ -173,7 +180,8 @@ int doesSoundRecordExist(
 int addSoundToBank( int inNumSoundFileBytes,
                     unsigned char *inSoundFileData,
                     const char *inType = "AIFF",
-                    char inSaveToDisk = false );
+                    char inSaveToDisk = false,
+                    const char *inAuthorTag = NULL );
 
 
 // frees memory associated with reverb filter

@@ -27,6 +27,11 @@
 
 #include "binFolderCache.h"
 
+#include "authorship.h"
+
+#include "musicPlayer.h"
+
+
 
 
 static int mapSize;
@@ -650,6 +655,8 @@ float initSoundBankStep() {
             r->id = 0;
             r->hash = 0;
             r->sha1Hash = NULL;
+            r->lengthInSeconds = 0;
+            
             
             sscanf( fileName, "%d.", &( r->id ) );
             
@@ -661,10 +668,15 @@ float initSoundBankStep() {
             if( soundData != NULL ) {
                 
                 int numSamples;
-                int16_t *samples;
-                
+                // mono
+                int16_t *samplesM = NULL;
+
+                // left and right, for stereo OGG files
+                int16_t *samplesL = NULL;
+                int16_t *samplesR = NULL;
+
                 if( strstr( fileName, ".aiff" ) != NULL ) {
-                    samples =
+                    samplesM =
                         readMono16AIFFData( soundData, 
                                             soundDataLength, &numSamples );
                     }
@@ -674,20 +686,41 @@ float initSoundBankStep() {
                     int numChan = getOGGChannels( o );
                     if( numChan == 1 ) {
                         numSamples = getOGGTotalSamples( o );
-                        samples = new int16_t[ numSamples ];
+                        samplesM = new int16_t[ numSamples ];
                         
-                        readAllMonoSamplesOGG( o, samples );
+                        readAllMonoSamplesOGG( o, samplesM );
                         }
-                    // skip non-mono OGG files
+                    else if( numChan == 2 ) {
+                        numSamples = getOGGTotalSamples( o );
+                        samplesL = new int16_t[ numSamples ];
+                        samplesR = new int16_t[ numSamples ];
+                        
+                        readAllStereoSamplesOGG( o, samplesL, samplesR );
+                        
+                        }
+                    
+                    // skip non-mono and non-stereo OGG files
                     
                     closeOGG( o );
                     }
                 
 
-                if( samples != NULL ) {
+                if( samplesM != NULL ||
+                    ( samplesL != NULL && samplesR != NULL ) ) {
                     
-                    r->sound = setSoundSprite( samples, numSamples );
+                    if( samplesM != NULL ) {
+                        r->sound = setSoundSprite( samplesM, numSamples );
+                        delete [] samplesM;
+                        }
+                    else {
+                        r->sound = setSoundSprite( samplesL, samplesR, 
+                                                   numSamples );
+                        delete [] samplesL;
+                        delete [] samplesR;
+                        }
                     
+                    r->lengthInSeconds = numSamples / (double)getSampleRate();
+
                     if( doComputeSoundHashes ) {
                         recomputeSoundHash( r, soundDataLength, soundData );
                         }
@@ -697,8 +730,6 @@ float initSoundBankStep() {
                     if( maxID < r->id ) {
                         maxID = r->id;
                         }
-
-                    delete [] samples;                    
                     }
                 delete [] soundData;
                 }
@@ -963,8 +994,26 @@ char *getSoundBankLoadFailure() {
     }
 
 
+static char musicSupressedByLongSound = false;
+
+static double musicSupressionStopTime = 0;
+
+
 
 void stepSoundBank() {
+    
+    if( musicSupressedByLongSound ) {
+        // check if suppression is over
+        
+        if( game_getCurrentTime() > musicSupressionStopTime ) {
+            
+            musicSupressedByLongSound = false;
+            
+            removeMusicSuppression( "soundBankLongSound" );
+            }
+        }
+
+
     // no more dynamic loading or unloading
     // they are all loaded at startup
     return;
@@ -1013,7 +1062,9 @@ void stepSoundBank() {
                 if( samples != NULL ) {
                     
                     r->sound = setSoundSprite( samples, numSamples );
-                            
+                    
+                    r->lengthInSeconds = numSamples / (double)getSampleRate();
+
                     delete [] samples;
                     }
                 
@@ -1101,6 +1152,25 @@ void playSound( int inID, double inVolumeTweak, double inStereoPosition,
                 }
 
             idMap[inID]->numStepsUnused = 0;
+            
+            if( idMap[inID]->lengthInSeconds > 5 ) {
+                
+                if( musicSupressedByLongSound ) {
+                    // we already have a long sound playing
+                    // don't add another one
+                    return;
+                    }
+                
+                musicSupressedByLongSound = true;
+                addMusicSuppression( "soundBankLongSound" );
+
+                musicSupressionStopTime = 
+                    game_getCurrentTime() + idMap[inID]->lengthInSeconds;
+                }
+            
+
+            
+
             
             if( reverbDisabled || idMap[inID]->reverbSound == NULL ) {
                 // play just sound, ignore mix param    
@@ -1289,6 +1359,18 @@ void playSound( SoundSpriteHandle inSoundSprite,
     }
 
 
+
+double getSoundLengthInSeconds( int inID ) {
+    SoundRecord *r = getSoundRecord( inID );
+    
+    if( r == NULL ) {
+        return 0;
+        }
+
+    return r->lengthInSeconds;
+    }
+
+
     
 char markSoundLive( int inID ) {
     SoundRecord *r = getSoundRecord( inID );
@@ -1368,6 +1450,31 @@ void deleteSoundFromBank( int inID ) {
         delete [] fileNameAIFF;
 
 
+        const char *printFormatOGG = "%d.ogg";
+
+        char *fileNameOGG = autoSprintf( printFormatOGG, inID );
+        File *soundFileOGG = soundsDir.getChildFile( fileNameOGG );
+        
+        soundFileOGG->remove();
+        delete soundFileOGG;
+
+        delete [] fileNameOGG;
+        
+
+        // delete .txt file which may contain author tag
+        
+        const char *printFormatTXT = "%d.txt";
+
+        char *fileNameTXT = autoSprintf( printFormatTXT, inID );
+        File *soundFileTXT = soundsDir.getChildFile( fileNameTXT );
+        
+        soundFileTXT->remove();
+        delete soundFileTXT;
+
+        delete [] fileNameTXT;
+        
+        
+
         loadedSounds.deleteElementEqualTo( inID );
 
         
@@ -1437,6 +1544,41 @@ char startRecordingSound() {
 
 
 
+
+
+
+void addAuthorshipFile( int inID, const char *inAuthorTag = NULL ) {
+    
+    char deleteTag = false;    
+
+    const char *authorTag = inAuthorTag;
+
+    if( authorTag == NULL ) {
+        authorTag = getAuthorHash();
+        deleteTag = true;
+        }
+    
+    const char *printFormatTXT = "%d.txt";
+    
+    char *fileNameTXT = autoSprintf( printFormatTXT, inID );
+    
+    File soundsDir( NULL, "sounds" );
+
+    File *txtFile = soundsDir.getChildFile( fileNameTXT );
+        
+    delete [] fileNameTXT;
+
+    char *fileContents = autoSprintf( "author=%s", authorTag );
+    
+    if( deleteTag ) {
+        delete [] authorTag;
+        }
+
+    txtFile->writeToFile( fileContents );
+    delete [] fileContents;
+    
+    delete txtFile;    
+    }
 
 
 
@@ -1604,6 +1746,11 @@ int stopRecordingSound() {
         delete eqSoundFile;
 
         delete [] fileNameAIFF;
+
+        
+        // save authorship tag
+        addAuthorshipFile( nextSoundNumber );
+
         
         
         delete [] samples;
@@ -1668,6 +1815,9 @@ int stopRecordingSound() {
     r->id = newID;
     r->sound = setSoundSprite( &( samples[ finalStartPoint ] ),
                                finalNumSamples );
+    
+    r->lengthInSeconds = finalNumSamples / (double)getSampleRate();
+    
     r->reverbSound = NULL;
 
     r->hash = 0;
@@ -1865,7 +2015,8 @@ int doesSoundRecordExist(
 int addSoundToBank( int inNumSoundFileBytes,
                     unsigned char *inSoundFileData,
                     const char *inType,
-                    char inSaveToDisk ) {
+                    char inSaveToDisk,
+                    const char *inAuthorTag ) {
 
     int numSamples;
     int16_t *samples = NULL;
@@ -1932,6 +2083,9 @@ int addSoundToBank( int inNumSoundFileBytes,
     
     r->id = newID;
     r->sound = setSoundSprite( samples, numSamples );
+
+    r->lengthInSeconds = numSamples / (double)getSampleRate();
+    
     r->reverbSound = NULL;
 
     if( reverbConvolution.savedNumWindowsB != -1 ) {
@@ -1995,7 +2149,11 @@ int addSoundToBank( int inNumSoundFileBytes,
 
             delete [] fileName;          
 
-        
+            
+            if( inAuthorTag != NULL ) {
+                addAuthorshipFile( newID, inAuthorTag );
+                }
+
             File *nextNumberFile = 
                 soundsDir.getChildFile( "nextSoundNumber.txt" );
             

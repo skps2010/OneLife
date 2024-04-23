@@ -35,7 +35,7 @@ echo ""
 
 
 apt-get -o Acquire::ForceIPv4=true update
-apt-get -y install emacs-nox mercurial git g++ expect gdb make fail2ban ufw
+apt-get -y install emacs-nox mercurial git g++ expect gdb make fail2ban ufw glibc-tools
 
 
 echo ""
@@ -142,6 +142,7 @@ ln -s ../../$dataName/transitions .
 ln -s ../../$dataName/categories .
 ln -s ../../$dataName/tutorialMaps .
 ln -s ../../$dataName/dataVersionNumber.txt .
+ln -s ../../$dataName/contentSettings .
 
 git for-each-ref --sort=-creatordate --format '%(refname:short)' --count=1 refs/tags/OneLife_v* | sed -e 's/OneLife_v//' > serverCodeVersionNumber.txt
 

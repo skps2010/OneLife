@@ -78,6 +78,9 @@ photoCache.cpp \
 exporter.cpp \
 importer.cpp \
 settingsToggle.cpp \
+rocketAnimation.cpp \
+AHAPResultPage.cpp \
+AHAPSettingsPage.cpp \
 
 
 
@@ -154,6 +157,7 @@ NEEDED_MINOR_GEMS_OBJECTS = \
  ${NETWORK_FUNCTION_LOCKS_O} \
  ${LOOKUP_THREAD_O} \
  ${WEB_REQUEST_O} \
+ ${WEB_REQUEST_COMPLETION_THREAD_O} \
  ${URL_UTILS_O} \
  ${SETTINGS_MANAGER_O} \
  ${FINISHED_SIGNAL_THREAD_O} \

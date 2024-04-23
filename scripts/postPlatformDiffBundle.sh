@@ -193,15 +193,25 @@ git push -f --tags
 
 if [ $serversToo -gt 0 ]
 then
+
+	echo ""
+	echo "Running server code update step 1 on OHOL servers."
+	echo ""
 	~/checkout/OneLifeWorking/scripts/updateServerCodeStep1.sh
+
+	echo ""
+	echo "Running server code update step 1 on AHAP servers."
+	echo ""
+	~/checkout/OneLifeWorking/scripts/updateServerCodeAHAPStep1.sh
 fi
 
 
 echo ""
 echo "Updates pushed out to download servers."
-echo "About to make this new version $newVersion live and required."
+echo "About to make this new version $newVersion live and required"
+echo "for both OHOL and AHAP."
 echo ""
-echo "This is a good time to manually make a corresponding Steam build live."
+echo "This is a good time to manually make both corresponding Steam builds live."
 echo ""
 echo -n "Hit [ENTER] when ready: "
 read
@@ -209,7 +219,7 @@ read
 
 
 echo ""
-echo "Telling update server and reflector about latest version."
+echo "Telling update server and OHOL reflector about latest binary version."
 
 echo -n "$newVersion" > ~/diffBundles/latest.txt
 
@@ -217,7 +227,23 @@ echo -n "<?php \$version=$newVersion; ?>" > ~/www/reflector/requiredVersion.php
 
 
 
+echo ""
+echo "Telling AHAP reflector about latest binary version."
+
+echo -n "<?php \$version=$newVersion; ?>" > ~/www/ahapReflector/requiredVersion.php
+
+
+
+
 if [ $serversToo -gt 0 ]
 then
+	echo ""
+	echo "Running server code update step 2 on OHOL servers."
+	echo ""
 	~/checkout/OneLifeWorking/scripts/updateServerCodeStep2.sh
+
+	echo ""
+	echo "Running server code update step 2 on AHAP servers."
+	echo ""
+	~/checkout/OneLifeWorking/scripts/updateServerCodeAHAPStep2.sh
 fi

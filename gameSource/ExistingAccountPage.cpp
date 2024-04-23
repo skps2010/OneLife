@@ -34,11 +34,28 @@ extern char gamePlayingBack;
 
 extern char *userEmail;
 extern char *accountKey;
+extern char isAHAP;
 
 
 extern SpriteHandle instructionsSprite;
 
 extern char loginEditOverride;
+
+
+
+// result destroyed by caller
+static char *getLineageServerURL() {
+    char *url;
+    
+    if( isAHAP ) {
+        url = SettingsManager::getStringSetting( "ahapLineageServerURL", "" );
+        }
+    else {
+        url = SettingsManager::getStringSetting( "lineageServerURL", "" );
+        }
+    
+    return url;
+    }
 
 
 
@@ -80,6 +97,8 @@ ExistingAccountPage::ExistingAccountPage()
                            translate( "services" ) ),
           mTranslateButton( mainFont, -400, -40, 
                            translate( "translateButton" ) ),
+          mAHAPSettingsButton( mainFont, -522, 0, 
+                               translate( "ahapSettings" ) ),
           mPageActiveStartTime( 0 ),
           mFramesCounted( 0 ),
           mFPSMeasureDone( false ),
@@ -109,6 +128,7 @@ ExistingAccountPage::ExistingAccountPage()
     setButtonStyle( &mTutorialButton );
     setButtonStyle( &mServicesButton );
     setButtonStyle( &mTranslateButton );
+    setButtonStyle( &mAHAPSettingsButton );
 
     setButtonStyle( &mDisableCustomServerButton );
     
@@ -138,6 +158,7 @@ ExistingAccountPage::ExistingAccountPage()
     addComponent( &mTutorialButton );
     addComponent( &mServicesButton );
     addComponent( &mTranslateButton );
+    addComponent( &mAHAPSettingsButton );
     
     mLoginButton.addActionListener( this );
     mFriendsButton.addActionListener( this );
@@ -161,6 +182,7 @@ ExistingAccountPage::ExistingAccountPage()
     mTutorialButton.addActionListener( this );
     mServicesButton.addActionListener( this );
     mTranslateButton.addActionListener( this );
+    mAHAPSettingsButton.addActionListener( this );
     
     mDisableCustomServerButton.addActionListener( this );
 
@@ -220,7 +242,7 @@ void ExistingAccountPage::showDisableCustomServerButton( char inShow ) {
 
 void ExistingAccountPage::makeActive( char inFresh ) {
 
-    
+    mAHAPSettingsButton.setVisible( isAHAP );
 
     if( SettingsManager::getIntSetting( "tutorialDone", 0 ) ) {
         mTutorialButton.setVisible( true );
@@ -291,7 +313,7 @@ void ExistingAccountPage::makeActive( char inFresh ) {
         mEmailField.setContentsHidden( true );
         mKeyField.setContentsHidden( true );
         
-        char *url = SettingsManager::getStringSetting( "lineageServerURL", "" );
+        char *url = getLineageServerURL();
 
         char show = ( strcmp( url, "" ) != 0 )
             && isURLLaunchSupported();
@@ -386,6 +408,9 @@ void ExistingAccountPage::actionPerformed( GUIComponent *inTarget ) {
     else if( inTarget == &mServicesButton ) {
         setSignal( "services" );
         }
+    else if( inTarget == &mAHAPSettingsButton ) {
+        setSignal( "ahapSettings" );
+        }
     else if( inTarget == &mClearAccountButton ) {
         SettingsManager::setSetting( "email", "" );
         SettingsManager::setSetting( "accountKey", "" );
@@ -415,7 +440,7 @@ void ExistingAccountPage::actionPerformed( GUIComponent *inTarget ) {
         setSignal( "genes" );
         }
     else if( inTarget == &mFamilyTreesButton ) {
-        char *url = SettingsManager::getStringSetting( "lineageServerURL", "" );
+        char *url = getLineageServerURL();
 
         if( strcmp( url, "" ) != 0 ) {
             char *email = mEmailField.getText();
@@ -452,7 +477,15 @@ void ExistingAccountPage::actionPerformed( GUIComponent *inTarget ) {
         delete [] url;
         }
     else if( inTarget == &mTechTreeButton ) {
-        char *url = SettingsManager::getStringSetting( "techTreeURL", "" );
+        char *url;
+        
+        if( isAHAP ) {
+            url = SettingsManager::getStringSetting( "ahapTechTreeURL", "" );
+            }
+        else {
+            url = SettingsManager::getStringSetting( "techTreeURL", "" );
+            }
+        
 
         if( strcmp( url, "" ) != 0 ) {
             launchURL( url );
