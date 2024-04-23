@@ -95,7 +95,7 @@ ExistingAccountPage::ExistingAccountPage()
                            translate( "tutorial" ) ),
           mServicesButton( mainFont, -522, 300, 
                            translate( "services" ) ),
-          mTranslateButton( mainFont, -400, -40, 
+          mTranslateButton( mainFont, -522, 80, 
                            translate( "translateButton" ) ),
           mAHAPSettingsButton( mainFont, -522, 0, 
                                translate( "ahapSettings" ) ),
