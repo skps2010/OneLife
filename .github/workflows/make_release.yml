@@ -9,7 +9,7 @@ on:
         type: string
 jobs:
   build_windows:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: packages
         run: |
@@ -70,7 +70,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
   build_windows_zh_cn:
     needs: build_windows
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - name: scripts
         shell: cmd
@@ -106,7 +106,7 @@ jobs:
           asset_content_type: application/zip
   build_macos:
     needs: build_windows
-    runs-on: macos-latest
+    runs-on: macos-12
     steps:
       - name: packages
         run: |
