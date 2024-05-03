@@ -201,6 +201,8 @@ if( $handle ) {
         $curNumServers = file_get_contents_safe( $curNumServersFile );
                 
         if( $curNumServers === FALSE ) {
+            logMessage( "File $curNumServersFile does not exist, ".
+                        "re-saving with value 1." );
             $curNumServers = 1;
             file_put_contents( $curNumServersFile, $curNumServers );
             }
@@ -557,7 +559,7 @@ function tryServer( $inAddress, $inPort, $inReportOnly,
 
             $spreadingFile = "/tmp/" .$inAddress . "_" . $inPort . "_spreading";
             
-            if( $spreading ) {
+            if( $spreading && ! $inIgnoreSpreading ) {
 
                 if( ! file_exists( $spreadingFile ) ) {    
                     // remember that we've crossed the spreading
@@ -574,11 +576,11 @@ function tryServer( $inAddress, $inPort, $inReportOnly,
                                 "$inAddress, starting to spread to next server." );
                     }
                 }
-            else if( file_exists( $spreadingFile ) ) {
+            else if( ! $inIgnoreSpreading && file_exists( $spreadingFile ) ) {
                 $spreading = true;
                 }
 
-            if( $stopSpreading ) {
+            if( $stopSpreading && ! $inIgnoreSpreading ) {
                 // we've dropped back down below the spreading fraction
                 // stop sending people to servers further down
                 // the list from this one
@@ -617,13 +619,12 @@ function tryServer( $inAddress, $inPort, $inReportOnly,
 
             // got here, return this server
 
-            // we successfully sent another player there
-            // update our count for this server right away
-            $current++;
-            file_put_contents( $currentFile, "$current" );
-
-
             if( ! $inTestOnly ) {    
+                // we successfully sent another player there
+                // update our count for this server right away
+                $current++;
+                file_put_contents( $currentFile, "$current" );
+
                 echo "$inAddress\n";
                 echo "$inPort\n";
                 echo "$version\n";

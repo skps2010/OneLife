@@ -1,4 +1,4 @@
-int versionNumber = 419;
+int versionNumber = 423;
 
 
 
@@ -1867,3 +1867,5 @@ void addMusicSuppression( const char *inActionName ) {
 void removeMusicSuppression( const char *inActionName ) {
     }
 
+void delayAgingMusic( double inDelaySeconds ) {
+    }
