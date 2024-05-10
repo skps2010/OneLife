@@ -4,6 +4,70 @@ http://onehouronelife.com/updateLog.php
 
 
 
+Version 425   2024-May-10
+
+--PLANET settings page now allows you to specify your PayPal email address,
+  which will be used for delivering your revshare for content you contribute
+  to AHAP.
+
+--ahapTechTreeURL changed to ahap.info    Fixes #1065
+
+--Ctrl-c in-game now copies recent speech log, from past 30 seconds, to system
+  clipboard.  This will help non-English-speaking users who are trying to paste
+  speech into translation services.  Fixes #1029
+
+--Added a lot more logging around required version numbers when PLEASE UPGRADE
+  error pages are shown.
+
+--Fixed so that Object Editor doesn't allow baking of non-90 rotated sprites
+  (which were being rounded, by surprise, to closest 90-degree rotation).
+  It now shows a message explaining why the bake cannot occur.  Fixes #1070
+
+--Slider for simulating uses in Object Editor now works the same way as slider
+  in Scene editor.  Fixes #1073
+
+--Fixed bug that was causing author= line in transition files to get
+  interpreted as comment if transition had no comment, resulting in
+  duplication of author= line when transition was saved again.  Fixes #1071
+
+--When using import_replace folder, if an object ID doesn't exist, the next
+  object ID is used instead of inflating the local object ID space by
+  force-inserting an ID.  Fixes #1072
+
+--Fixed glitch in rolling back object ID and sprite ID when deleting last item
+  in bank (to prevent ID inflation).
+
+
+
+
+
+Server Fixes:
+
+--Fixed typo in protocol.txt for server.  Fixes #1066  Thanks 4ferrocyanide  
+
+--ahapGate now has show_vote_stats call.  Part of #1064
+
+--Life Log stats (public data) now include status=N for normal player or
+  status=D for d-town player.  Fixes #1041
+
+--Fixed major bug when maxFlightDistanced.ini is 0 (current setting), which was
+  preventing planes from landing anywhere but closest landing pad.
+  Part of #1040
+
+--Server now saves known landing positions to landingLocations.txt to re-load
+  after next server startup, so landing pads aren't forgotten across server
+  restarts.  Part of #1040
+
+--Improved messaging to player when building something fails due to nearPop
+  restrictions.  If the required distance is short (less than 200), then we
+  tell them specifically how many people need to be nearby.  This is in
+  preparation for using this feature for rocket pads, which will need to be
+  built in villages with lots of people very close by.
+
+
+
+
+
 Version 423    2024-May-3
 
 --Fixed so that aging-triggered music is delayed while rocket animation is
