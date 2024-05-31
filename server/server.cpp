@@ -757,6 +757,9 @@ typedef struct LiveObject {
         GridPos birthPos;
         GridPos originalBirthPos;
         
+        char postApocalypsePosSet;
+        GridPos postApocalypsePos;
+        
 
         int parentID;
 
@@ -1743,6 +1746,127 @@ static char checkReadOnly() {
 static void setupToolSlots( LiveObject *inPlayer );
 
 
+static int isPlayerCountable( LiveObject *p, int inLineageEveID = -1,
+                              int inRace = -1 );
+
+
+
+static void findPostApocalypsePositions() {
+
+    int playerCount = 0;
+    
+    int uncountedPlayers = 0;
+
+    for( int i=0; i<players.size(); i++ ) {
+        LiveObject *nextPlayer = players.getElement( i );
+        
+        if( isPlayerCountable( nextPlayer ) ) {
+            
+            nextPlayer->postApocalypsePosSet = false;
+            playerCount++;
+            }
+        else {
+            // leave uncountable players positions set with no change
+            nextPlayer->postApocalypsePosSet = true;
+            uncountedPlayers++;
+            }
+        }
+
+
+    char numClusters = 0;
+    
+    char someNewSet = true;
+
+    while( someNewSet ) {
+        someNewSet = false;
+        
+        LiveObject *seedPlayer = NULL;
+        
+        for( int i=0; i<players.size(); i++ ) {
+            LiveObject *nextPlayer = players.getElement( i );
+            
+            if( ! nextPlayer->postApocalypsePosSet ) {
+                seedPlayer = nextPlayer;
+                break;
+                }
+            }
+        
+        if( seedPlayer == NULL ) {
+            break;
+            }        
+        
+        someNewSet = true;
+        numClusters++;
+        
+        SimpleVector<LiveObject*> cluster;
+
+
+        // mark as set for now so we stop considering
+        // this player when adding additional players to cluster
+        seedPlayer->postApocalypsePosSet = true;
+        
+        cluster.push_back( seedPlayer );
+        
+
+
+        char addedToCluster = true;
+        
+        double maxDist = 15;
+
+        while( addedToCluster ) {
+            addedToCluster = false;
+            
+            for( int i=0; i<players.size(); i++ ) {
+                LiveObject *nextPlayer = players.getElement( i );
+            
+                if( ! nextPlayer->postApocalypsePosSet ) {
+                    
+                    GridPos playerPos = { nextPlayer->xd, nextPlayer->yd };
+                    
+                    for( int j=0; j<cluster.size(); j++ ) {
+                        
+                        LiveObject *otherPlayer = cluster.getElementDirect( j );
+                        
+                        GridPos otherPlayerPos = 
+                            { otherPlayer->xs, otherPlayer->ys };
+                        
+                        if( distance( playerPos, otherPlayerPos ) <= maxDist ) {
+                            
+                            // set this now so we stop considering them
+                            nextPlayer->postApocalypsePosSet = true;
+                            
+                            cluster.push_back( nextPlayer );
+                            addedToCluster = true;
+                            break;
+                            }
+                        }
+                    }
+                }
+            }
+        
+        GridPos seedPos = { seedPlayer->xd, seedPlayer->yd };
+        
+        // center cluster on seed player after apocalypse
+
+        for( int j=0; j<cluster.size(); j++ ) {
+                        
+            LiveObject *player = cluster.getElementDirect( j );
+            
+            player->postApocalypsePos.x = player->xd - seedPos.x;
+            player->postApocalypsePos.y = player->yd - seedPos.y;
+
+            // this should have been set when adding players to cluster
+            // above
+            player->postApocalypsePosSet = true;
+            }
+        }
+
+    AppLog::infoF( "Apocalypse found %d moveable players and %d unmoveable "
+                  "players.  Moving %d clusters back to (0,0).",
+                  playerCount, uncountedPlayers, numClusters );
+    }
+
+
 
 // returns a person to their natural state
 static void backToBasics( LiveObject *inPlayer ) {
@@ -1790,7 +1914,52 @@ static void backToBasics( LiveObject *inPlayer ) {
     p->learnedTools.deleteAll();
     p->partiallyLearnedTools.deleteAll();
     p->numToolSlots = -1;
+
+
+    if( isPlayerCountable( p ) ) {    
+        // end any moves, and move everyon back around 0,0
+        
+        // to their post-apocalypse positions, which we set up earlier
+
+        if( p->postApocalypsePosSet ) {
+            p->xs = p->postApocalypsePos.x;
+            p->ys = p->postApocalypsePos.y;
+            }
+        else {
+            p->xs = 0;
+            p->ys = 0;
+            }
+
+
+        if( p->pathToDest != NULL ) {
+            delete [] p->pathToDest;
+            p->pathToDest = NULL;
+            }
+
+        p->pathLength = 0;
+        p->pathTruncated = 0;
+        p->moveStartTime = Time::getCurrentTime();
+        p->moveTotalSeconds = 0;
+
+        p->xd = p->xs;
+        p->yd = p->ys;
+        
+        
+        p->birthPos.x = p->xs;
+        p->birthPos.y = p->ys;
+        
+        p->originalBirthPos = p->birthPos;
+        
+        p->actionTarget = p->birthPos;
+        
+        p->actionAttempt = false;
+
+        p->posForced = true;
+        }
     
+
+
+
     setupToolSlots( p );
     }
 
@@ -8030,8 +8199,8 @@ static LiveObject *getHitPlayer( int inX, int inY,
 
 
 
-static int isPlayerCountable( LiveObject *p, int inLineageEveID = -1,
-                              int inRace = -1 ) {
+static int isPlayerCountable( LiveObject *p, int inLineageEveID,
+                              int inRace) {
     if( p->error ) {
         return false;
         }
@@ -13577,11 +13746,22 @@ void apocalypseStep() {
 
                 AppLog::infoF( "Apocalypse freeMap took %f sec",
                                Time::getCurrentTime() - startTime );
+                
+                resetEveRadius();
+                resetEveLocation();
+                
+                
+                startTime = Time::getCurrentTime();
+
                 wipeMapFiles();
 
                 AppLog::infoF( "Apocalypse wipeMapFiles took %f sec",
                                Time::getCurrentTime() - startTime );
                 
+
+                
+                startTime = Time::getCurrentTime();
+
                 initMap();
 
                 reseedMap( true );
@@ -13598,6 +13778,9 @@ void apocalypseStep() {
 
                 lastRemoteApocalypseCheckTime = curTime;
                 
+                
+                findPostApocalypsePositions();
+
                 for( int i=0; i<players.size(); i++ ) {
                     LiveObject *nextPlayer = players.getElement( i );
                     backToBasics( nextPlayer );
@@ -18715,6 +18898,9 @@ int main() {
             }
         else if( shutdownMode ) {
             // any disconnected players should be killed now
+            
+            char someNonGhostsRemainAlive = false;
+            
             for( int i=0; i<players.size(); i++ ) {
                 LiveObject *nextPlayer = players.getElement( i );
                 if( ! nextPlayer->error && ! nextPlayer->connected ) {
@@ -18726,7 +18912,36 @@ int main() {
                     nextPlayer->errorCauseString =
                         "Disconnected during shutdown";
                     }
+                else if( ! nextPlayer->error &&
+                         nextPlayer->connected &&
+                         ! nextPlayer->isGhost ) {
+                    someNonGhostsRemainAlive = true;
+                    }
                 }
+
+            if( ! someNonGhostsRemainAlive ) {
+                // everyone left alive is a ghost?
+                // ghosts are preventing the server from shutting down
+                // they could delay it forever
+                // force-kill all ghosts
+
+                for( int i=0; i<players.size(); i++ ) {
+                    
+                    LiveObject *nextPlayer = players.getElement( i );
+                    
+                    if( ! nextPlayer->error && nextPlayer->connected &&
+                        nextPlayer->isGhost ) {
+                    
+                        setDeathReason( nextPlayer, 
+                                        "exorcism_shutdown" );
+                    
+                        nextPlayer->error = true;
+                        nextPlayer->errorCauseString =
+                            "Remaining ghost destroyed during shutdown";
+                        }
+                    }
+                }
+            
             }
         
 
@@ -19745,6 +19960,21 @@ int main() {
                                 sscanf( tokens->getElementDirect( 4 ),
                                         "%d", 
                                         &( nextConnection->tutorialNumber ) );
+                                
+                                if( nextConnection->tutorialNumber != 0 ) {
+                                    
+                                    useContentSettings();
+                                
+                                    int tutorialEnabled = 
+                                        SettingsManager::getIntSetting( 
+                                            "tutorialEnabled", 0 );
+                                    
+                                    useMainSettings();
+                                    
+                                    if( ! tutorialEnabled ) {
+                                        nextConnection->tutorialNumber = 0;
+                                        }
+                                    }
                                 }
                             
                             if( tokens->size() == 7 ) {

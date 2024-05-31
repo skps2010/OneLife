@@ -67,7 +67,7 @@ echo "Updating minorGems"
 echo ""
 
 cd ~/checkout/minorGems
-git pull --tags
+~/checkout/OneLifeWorking/scripts/gitPullComplete.sh
 
 
 
@@ -85,7 +85,7 @@ echo "Updating AnotherPlanetDataLatest"
 echo ""
 
 cd ~/checkout/AnotherPlanetDataLatest
-git pull --tags
+~/checkout/OneLifeWorking/scripts/gitPullComplete.sh
 
 
 
@@ -132,7 +132,7 @@ echo "Updating OneLifeWorking"
 echo ""
 
 cd ~/checkout/OneLifeWorking
-git pull --tags
+~/checkout/OneLifeWorking/scripts/gitPullComplete.sh
 
 
 echo "" 
@@ -211,6 +211,7 @@ rm ~/checkout/ahapDiffWorking/dataLatest/.hg*
 rm -rf ~/checkout/ahapDiffWorking/dataLatest/soundsRaw
 rm -rf ~/checkout/ahapDiffWorking/dataLatest/faces
 rm -rf ~/checkout/ahapDiffWorking/dataLatest/scenes
+rm -rf ~/checkout/ahapDiffWorking/dataLatest/settings
 rm -r ~/checkout/ahapDiffWorking/dataLatest/*.sh ~/checkout/ahapDiffWorking/dataLatest/working ~/checkout/ahapDiffWorking/dataLatest/overlays
 echo -n "$newVersion" > ~/checkout/ahapDiffWorking/dataLatest/dataVersionNumber.txt
 
@@ -227,6 +228,7 @@ rm ~/checkout/ahapDiffWorking/dataLast/.hg*
 rm -rf ~/checkout/ahapDiffWorking/dataLast/soundsRaw
 rm -rf ~/checkout/ahapDiffWorking/dataLast/faces
 rm -rf ~/checkout/ahapDiffWorking/dataLast/scenes
+rm -rf ~/checkout/ahapDiffWorking/dataLast/settings
 rm -r ~/checkout/ahapDiffWorking/dataLast/*.sh ~/checkout/ahapDiffWorking/dataLast/working ~/checkout/ahapDiffWorking/dataLast/overlays
 
 
@@ -347,7 +349,7 @@ echo ""
 
 
 cd ~/checkout/AnotherPlanetData
-git pull
+~/checkout/OneLifeWorking/scripts/gitPullComplete.sh
 rm */cache.fcz
 rm */bin_cache.fcz
 
@@ -426,7 +428,7 @@ echo "Re-compiling non-running local server code base as a sanity check"
 echo ""
 
 cd ~/checkout/OneLife/server
-git pull
+~/checkout/OneLifeWorking/scripts/gitPullComplete.sh
 
 ./configure 1
 make

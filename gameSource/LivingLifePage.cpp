@@ -19068,6 +19068,11 @@ void LivingLifePage::step() {
                             mDeathReason = stringDuplicate( 
                                 translate( "reasonExorcism" ) );
                             }
+                        else if( strcmp( reasonString, 
+                                         "exorcism_shutdown" ) == 0 ) {
+                            mDeathReason = stringDuplicate( 
+                                translate( "reasonShutdown" ) );
+                            }
                         else if( strcmp( reasonString, "disconnected" ) == 0 ) {
                             mDeathReason = stringDuplicate( 
                                 translate( "reasonDisconnected" ) );
@@ -24316,6 +24321,11 @@ void LivingLifePage::pointerDown( float inX, float inY ) {
     if( vogMode ) {
         return;
         }
+    
+    if( apocalypseInProgress ) {
+        return;
+        }
+    
 
     char modClick = false;
     
