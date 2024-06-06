@@ -71,6 +71,7 @@ class SettingsPage : public GamePage, public ActionListener {
         ValueSlider mCursorScaleSlider;
         
 
+        TextButton mTranslateButton;
         void checkRestartButtonVisibility();
         
     };
