@@ -4,6 +4,35 @@ http://onehouronelife.com/updateLog.php
 
 
 
+Version 428    2024-July-11
+
+--Added more logging around cases where startUpdate in diffBundleClient fails.
+  Part of jasonrohrer/OneLife#1082
+
+--Fixed crash when viewing email on SERVICES page if email blank.  Fixes #1085
+
+--Fixed so that authorship hash is NOT overwritten when editing an object.
+  Original authorship of an object is preserved, even if the object is
+  modified later by someone else.  Fixes #1093
+
+
+
+
+Server Fixes:
+
+--Fixed AHAPGate to handle names with apostrophes.  Thanks Aaron O.
+
+--Fixed so that Rocket Ride animation is not shown to tutorial players, which
+  might confuse them (unless the tutorial player themself is riding the
+  rocket).  Part of #1080
+
+--Fixed to not send Monument Call (MN) messages to tutorial players, which can
+  be confusing.  Thus, tutorial players no longer get arrows to the rocket,
+  bell, or endtower.  Fixes #1080
+
+
+
+
 Version 427   2024-May-31
 
 --Apocalypse jumps everyone back to (0,0).  Part of #1069

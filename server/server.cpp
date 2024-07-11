@@ -13866,7 +13866,9 @@ void monumentStep() {
             nextPlayer->lastMonumentID = monumentCallID;
             nextPlayer->monumentPosSent = true;
             
-            if( !nextPlayer->error && nextPlayer->connected ) {
+            if( ! nextPlayer->error && 
+                nextPlayer->connected &&
+                ! nextPlayer->isTutorial ) {
                 
                 char *message = autoSprintf( "MN\n%d %d %d\n#", 
                                              monumentCallX -
@@ -18299,6 +18301,14 @@ void startAHAPGrant( int inX, int inY, LiveObject *inPlayer ) {
         LiveObject *nextPlayer = players.getElement(p);
         
         if( nextPlayer->error ) {
+            continue;
+            }
+
+        // don't show confusing rocket ride animation to tutorial players
+        // UNLESS the tutorial player themselves rode the rocket
+        if( nextPlayer->isTutorial
+            && nextPlayer->id != inPlayer->id ) {
+            
             continue;
             }
 
