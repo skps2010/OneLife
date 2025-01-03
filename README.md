@@ -13,7 +13,9 @@
 # OneLife
 The purpose of this mod is to translate One Hour One Life into different languages.  
 It supports Unicode and has a translation tool.  
-It currently support Traditional Chinese, Simplified Chinese and Ukrainian.  
+It currently support Traditional Chinese, Simplified Chinese and Ukrainian.
+
+This mod also allow the game to run in MacOS operating system.
 
 ## How to use
 
@@ -73,6 +75,8 @@ You can also join [Kook](https://kook.top/E9cHJL).
 此模組支援 Unicode 並擁有翻譯工具。  
 目前支援正體中文、簡體中文和烏克蘭文。
 
+此模組也讓遊戲支援 MacOS 作業系統。
+
 ## 如何使用(正體)
 
 ### Windows
@@ -131,6 +135,8 @@ You can also join [Kook](https://kook.top/E9cHJL).
 此模组的目的是将 One Hour One Life 翻译成不同语言。  
 此模组支持 Unicode 并拥有翻译工具。  
 目前支持简体中文、繁体中文和乌克兰文。
+
+此模組也讓遊戲支援 MacOS 作業系統。
 
 ## 如何使用(简体)
 
