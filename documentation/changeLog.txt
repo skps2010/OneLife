@@ -4,6 +4,109 @@ http://onehouronelife.com/updateLog.php
 
 
 
+
+Version 430    2025-January-13
+
+--Button on AHAP Voting Page now says VOTE (used to say POST).  Part of #1107
+
+--Fixed client to parse arbitrary number of underscore-delimited curse words in
+  a CU message, instead of just two.  Old client will display the extra
+  underscores in the spoken curse words, which looks ugly, but still works for
+  now until next client build is pushed out.  Part of #1119
+
+--Fixed mod exporter code to avoid duplicating author=author= in .txt files
+  for sound files included in export.  Part of #1114
+
+--copyChangesToRepo.bat utility script now copies txt files from sounds
+  folder.  Part of #1114
+
+--Support for settings/wordBlacklist.ini file. which lets you list words you no
+  longer want to see in other players' speech.  These words will be replaced
+  with XXXX when spoken by anyone.
+
+--Fixed a memory leak in minorGems/util/SettingsManager.cpp
+
+--Support for /BLACKLIST WORD1 WORD2 WORD3 chat slash command, to add words
+  to your personal blacklist.
+
+--Fixed a memory leak if you die with the typing-speech notepad open.
+
+--Fixed so that if you type a really long word with no spaces in the
+  typing-speech notepad, it doesn't overflow the notepad line (the long word is
+  broken up to fit).  This also fixes very long words in speech bubbles (which
+  used to make very long speech bubbles that would go off screen).
+
+--Word blacklist now applies to DING message too (but not tutorial messages).
+
+--No longer have a short limit on /COMMAND slash command length (was 23, now
+  200) so that a long list of /BLACKLIST words can by added in one go.
+
+--/BLACKLIST !WORD now matches TESTWORDBLAH and W O RD and W...O?RD
+
+--The exclaimation point version of blacklist now also blocks WWWOOORRDD
+  (and other spaced-out forms) with repeated letters.
+
+--OneLifeSever now has a command-line argument 'rebuild' which forces it to
+  clear its cache files and rebuild them.  Fixes #1123
+
+--New client setting:  ahapSkipDataUpdate.ini   When set to 1, this blocks the
+  client from fetching the lastest AHAP game data from the content server.  If
+  you're working on making content, this prevents what you're working on from
+  getting overwritten by accident by new content when you launch the client to
+  test it.  Fixes #1125
+
+
+
+
+Server Fixes:
+
+--Fixed so that shutdownLongLineagePos.txt is cleared during apocalypse, so
+  that Eve location is fully reset to 0.  Fixes #1103
+
+--Fixed crash when rocket ride is interrupted by rider disconnecting and then
+  re-connecting as a twin.  Fixes #1110
+
+--Now counts AHAP votes over 30 day window.  Also shows candidate github
+  usernames on vote stats page.  Part of #1107
+
+--AHAP vote stats page now shows full list of registered github names (who you
+  can vote for).
+
+--Support for forceBoyAccounts.ini list in server settings, preventing those
+  accounts from being born as girls (if not Eve).  Useful for bots, to make
+  sure bots are never mothers.
+
+--Fixed so that AHAP leader votes are tracked internally by github account
+  name, and not by email.  This fixes the problem where one user specifies
+  someone else's github as their own to falsely receive votes for themselves.
+  Part of #1112
+
+--Server now uses 3 curse words per player, instead of two.  Since there are
+  201 useable curse words, this takes the number of combinations up from
+  40,401 up to over 8 million, which reduces the chances of a duplicate
+  combination being used.  Fixes #1119
+
+--pullAndBuildTestSystem.sh script now links contentSettings correctly for
+  both client and server.  Fixes #1117
+
+--updateGate now gives the content leader power to trigger an AHAP map wipe.
+  Part of #1116
+
+--Fixed so that if Eve (or another family member) creates their first well
+  outside the birthland band, it doesn't unlock iron.  Only wells dug inside
+  the birthland band can be primary homelands and unlock iron.  Fixes #1120
+
+--Fixed typo in generateDataOnlyDiffBundleAHAP.sh script.
+
+--CoordinateTimeTracking now manually requests fast vector methods, making it
+  2x faster. 
+
+--Max flight distance back to 10,000, to prevent d-town apocalylpse.
+
+--New pullAndBuilTestSystemAHAP.sh script.  Fixes #1142
+
+
+
 Version 428    2024-July-11
 
 --Added more logging around cases where startUpdate in diffBundleClient fails.

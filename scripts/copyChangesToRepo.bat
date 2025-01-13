@@ -43,6 +43,8 @@ call :folderCheck sprites
 
 call :folderCheck transitions
 
+call :folderCheck categories
+
 
 call :folderCopy animations txt
 
@@ -62,6 +64,8 @@ call :folderCopy sounds aiff
 
 call :folderCopy sounds ogg
 
+call :folderCopy sounds txt
+
 call :folderCopy sounds fcz
 
 call :folderCopy sprites tga
@@ -69,6 +73,8 @@ call :folderCopy sprites tga
 call :folderCopy sprites txt
 
 call :folderCopy transitions txt
+
+call :folderCopy categories txt
 
 
 echo:

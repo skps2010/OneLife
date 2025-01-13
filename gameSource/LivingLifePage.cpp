@@ -228,6 +228,168 @@ double uniqueSpriteCountToDraw = 0;
 double pixelCountToDraw = 0;
 
 
+static SimpleVector<char*> wordBlacklist;
+
+
+// destroyed inSpeech and returns newly-allocated string (destroyed by caller)
+// with blacklist words replaced by XXXXX
+static char *applyWordBlacklist( char *inSpeech ) {
+    
+    SimpleVector<char *> *tokens = tokenizeString( inSpeech );
+    
+    delete [] inSpeech;
+
+    SimpleVector<char*> finalWords;
+    for( int i=0; i< tokens->size(); i++ ) {
+        char *word = tokens->getElementDirect( i );
+        
+        if( wordBlacklist.getMatchingStringIndex( word ) != -1 ) {
+            // word on blacklist
+            int wordLen = strlen( word );
+            
+            for( int c=0; c<wordLen; c++ ) {
+                word[c] = 'X';
+                }
+            }
+        finalWords.push_back( word );
+        }
+    delete tokens;
+    
+    char **wordArray = finalWords.getElementArray();
+    
+    char *outSpeech = join( wordArray, finalWords.size(), " " );
+    
+    delete [] wordArray;
+    
+    finalWords.deallocateStringElements();
+
+    
+    // now search for strings anywhere based on !WORD words on list
+    
+    for( int i=0; i< wordBlacklist.size(); i++ ) {
+        char *word = wordBlacklist.getElementDirect( i );
+        
+        if( strlen( word ) > 0 && word[0] == '!' ) {
+            char *wordStart = &( word[1] );
+            
+            int wordLen = strlen( wordStart );
+            
+            if( wordLen > 0 ) {
+                
+                char someNonX = false;
+                
+                for( int c=0; c<wordLen; c++ ) {
+                    if( wordStart[c] != 'X' ) {
+                        someNonX = true;
+                        break;
+                        }
+                    }
+                
+                // if word is XXXXX
+                // don't search and replace with X's, becasuse
+                // we'll infinite loop
+                if( someNonX ) {
+                    
+                    // look for WORD and W ORD and W,,,O R??D
+                    
+                    char firstLetter[2];
+                    firstLetter[0] = wordStart[0];
+                    firstLetter[1] = '\0';
+                    
+                    char *found = strstr( outSpeech, firstLetter );
+                
+                    while( found != NULL ) {
+                        SimpleVector<int> xIndex;
+                        xIndex.push_back( 0 );
+                        
+                        char match = true;
+
+                        char *next = &( found[1] );
+                        
+                        char prevLetter = found[0];
+                        
+                        int lookI = 1;
+
+                        int nextWordI = 1;
+                        unsigned lettersLeft = wordLen - 1;
+                        
+                        while( match && lettersLeft > 0 && 
+                               strlen( next ) >= lettersLeft ) {
+                            
+                            char nextLetter = next[0];
+                            
+                            if( nextLetter >= 'A' &&
+                                nextLetter <= 'Z' ) {
+                                
+                                if( nextLetter != wordStart[nextWordI] ) {
+                                    
+                                    if( nextLetter == prevLetter ) {
+                                        // maybe we're repeating letters
+                                        // like WOOORRRD
+                                        xIndex.push_back( lookI );
+                                        
+                                        // don't walk forward in our
+                                        // target word, b/c we haven't
+                                        // consumed another letter
+                                        }
+                                    else {
+                                        match = false;
+                                        }
+                                    }
+                                else {
+                                    prevLetter = nextLetter;
+                                    
+                                    xIndex.push_back( lookI );
+                                    
+                                    nextWordI++;
+                                    lettersLeft = wordLen - nextWordI;
+                                    }
+                                }
+                            lookI ++;
+                            
+                            next = &( found[lookI] );
+                            }
+                        
+                        if( lettersLeft != 0 ) {
+                            match = false;
+                            }
+                        if( match ) {    
+                            for( int f=0; f < xIndex.size(); f++ ) {
+                                found[ xIndex.getElementDirect( f ) ] = 'X';
+                                }
+                            }
+                        
+                        found = strstr( &( found[1] ), firstLetter );
+                        }
+                    }
+                }
+            }
+        }
+    
+
+    
+    return outSpeech;
+    }
+
+
+// inWordString destroyed by caller
+// can contain multiple words delimited by spaces
+static void addToBlacklist( char *inWordString ) {
+    SimpleVector<char *> *tokens = tokenizeString( inWordString );
+
+    for( int i=0; i< tokens->size(); i++ ) {
+        char *t = tokens->getElementDirect( i );
+        
+        if( wordBlacklist.getMatchingStringIndex( t ) == -1 ) {
+            wordBlacklist.push_back( stringDuplicate( t ) );
+            }
+        }
+    tokens->deallocateStringElements();
+    delete tokens;
+
+    SettingsManager::setSetting( "wordBlacklist", &wordBlacklist );
+    }
+
 
 
 
@@ -2801,6 +2963,25 @@ LivingLifePage::LivingLifePage()
           mXKeyDown( false ),
           mObjectPicker( &objectPickable, +510, 90 ) {
 
+    
+    
+    wordBlacklist.deallocateStringElements();
+
+    
+    
+    SimpleVector<char *> *wordList = 
+        SettingsManager::getSetting( "wordBlacklist" );
+    
+    for( int i=0; i< wordList->size(); i++ ) {
+        char *upper = stringToUpperCase( wordList->getElementDirect( i ) );
+        
+        wordBlacklist.push_back( upper );
+        }
+    
+    wordList->deallocateStringElements();
+    delete wordList;
+    
+    
 
     if( SettingsManager::getIntSetting( "useSteamUpdate", 0 ) ) {
         mUsingSteam = true;
@@ -3275,6 +3456,10 @@ LivingLifePage::~LivingLifePage() {
             numServerBytesRead, overheadServerBytesRead,
             numServerBytesSent, overheadServerBytesSent );
     
+    wordBlacklist.deallocateStringElements();
+
+    mLastKnownNoteLines.deallocateStringElements();
+
     clearRecordedSpeech();
     
     mBadBiomeNames.deallocateStringElements();
@@ -3608,24 +3793,69 @@ SimpleVector<char*> *splitLines( const char *inString,
     // break into lines
     SimpleVector<char *> *tokens = 
         tokenizeString( inString );
+
+    // watch out for long tokens (split them up)
+    
+    SimpleVector<char*> finalTokens;
+    
+    for( int t=0; t< tokens->size(); t++ ) {
+        char *thisToken = tokens->getElementDirect( t );
+        
+        while( handwritingFont->measureString( thisToken ) > inMaxWidth ) {
+            
+            int splitPoint = strlen( thisToken ) - 1;
+
+            char splitChar = thisToken[ splitPoint ];
+            
+            thisToken[ splitPoint ] = '\0';
+            
+            while( handwritingFont->measureString( thisToken ) > inMaxWidth ) {
+                // restore char at last cut
+                thisToken[splitPoint] = splitChar;
+                
+                // start new shorter cut
+                splitPoint --;
+                
+                splitChar = thisToken[ splitPoint ];
+            
+                thisToken[ splitPoint ] = '\0';
+                }
+
+            // found prefix that isn't too long
+            
+            finalTokens.push_back( stringDuplicate( thisToken ) );
+            
+
+            // restore char at cut point
+            thisToken[splitPoint] = splitChar;
+            
+            thisToken = &( thisToken[ splitPoint ] );
+            }
+        finalTokens.push_back( stringDuplicate( thisToken ) );
+        }
+    tokens->deallocateStringElements();
+    delete tokens;
+    
+    
+            
     
     
     // collect all lines before drawing them
     SimpleVector<char *> *lines = new SimpleVector<char*>();
     
     
-    if( tokens->size() > 0 ) {
+    if( finalTokens.size() > 0 ) {
         // start with firt token
-        char *firstToken = tokens->getElementDirect( 0 );
+        char *firstToken = finalTokens.getElementDirect( 0 );
         
         lines->push_back( firstToken );
         
-        tokens->deleteElement( 0 );
+        finalTokens.deleteElement( 0 );
         }
     
     
-    while( tokens->size() > 0 ) {
-        char *nextToken = tokens->getElementDirect( 0 );
+    while( finalTokens.size() > 0 ) {
+        char *nextToken = finalTokens.getElementDirect( 0 );
         
         char *currentLine = lines->getElementDirect( lines->size() - 1 );
          
@@ -3648,10 +3878,8 @@ SimpleVector<char*> *splitLines( const char *inString,
          
 
         delete [] nextToken;
-        tokens->deleteElement( 0 );
+        finalTokens.deleteElement( 0 );
         }
-    
-    delete tokens;
     
     return lines;
     }
@@ -12815,7 +13043,8 @@ void LivingLifePage::displayGlobalMessage( char *inMessage ) {
     char *spaces = replaceAll( lines, "_", " ", &found );
     
     delete [] lines;
-    
+
+    spaces = applyWordBlacklist( spaces );
     
     mGlobalMessageShowing = true;
     mGlobalMessageStartTime = game_getCurrentTime();
@@ -20484,6 +20713,11 @@ void LivingLifePage::step() {
                                 
                                 recordSpeech( existing->name,
                                               existing->currentSpeech );
+                            
+                                existing->currentSpeech = 
+                                    applyWordBlacklist( 
+                                        existing->currentSpeech );
+                                
                                 }
                             
 
@@ -20915,8 +21149,10 @@ void LivingLifePage::step() {
                                         stringDuplicate( buffer );
                                     char *barPos = strstr( existing->curseName,
                                                            "_" );
-                                    if( barPos != NULL ) {
+                                    while( barPos != NULL ) {
                                         barPos[0] = ' ';
+                                        barPos = strstr( existing->curseName,
+                                                         "_" );
                                         }
                                     
                                     // display their cursed tag now
@@ -21582,9 +21818,10 @@ void LivingLifePage::step() {
         
         if( strlen( currentText ) > 0 && currentText[0] == '/' ) {
             // typing a filter
-            // hard cap at 25, regardless of age
-            // don't want them typing long filters that overflow the display
-            sayCap = 23;
+            // long filter names no longer overflow the display
+            // and they can blacklist a whole list of words in one go
+            // so make this long
+            sayCap = 200;
             }
         delete [] currentText;
 
@@ -26179,11 +26416,16 @@ static void showPlayerLabel( LiveObject *inPlayer, const char *inLabel,
 
 
 
-static char commandTyped( char *inTyped, const char *inCommandTransKey ) {
+static char commandTyped( char *inTyped, const char *inCommandTransKey,
+                          char inLengthMustMatch = true ) {
     const char *command = translate( inCommandTransKey );
     
     if( strstr( inTyped, command ) == inTyped ) {
         
+        if( ! inLengthMustMatch ) {
+            return true;
+            }
+
         char *trimmedCommand = trimWhitespace( inTyped );
         
         unsigned int lengthTrim = strlen( trimmedCommand );
@@ -26723,6 +26965,16 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
                             else if( commandTyped( typedText, 
                                                    "orderCommand" ) ) {
                                 sendToServerSocket( (char*)"ORDR 0 0#" );
+                                }
+                            else if( commandTyped( typedText, 
+                                                   "blacklistCommand",
+                                                   false ) ) {
+                                
+                                char *firstSpace = strstr( typedText, " " );
+                                
+                                if( firstSpace != NULL ) {
+                                    addToBlacklist( firstSpace );
+                                    }
                                 }
                             else {
                                 // filter hints

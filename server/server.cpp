@@ -2065,6 +2065,16 @@ int getPlayerLineage( int inID ) {
 
 
 
+int getPlayerDisplayID( int inID ) {
+    LiveObject *o = getLiveObject( inID );
+    if( o != NULL ) {
+        return o->displayID;
+        }
+    return -1;
+    }
+
+
+
 char isPlayerIgnoredForEvePlacement( int inID ) {
     LiveObject *o = getLiveObject( inID );
     if( o != NULL ) {
@@ -6709,11 +6719,13 @@ static void makePlayerSay( LiveObject *inPlayer, char *inToSay ) {
             // words to Donkeytown players
             inPlayer->curseStatus.curseLevel == 0 ) {
 
-            char *message = autoSprintf( "CU\n%d 1 %s_%s\n#", targetP->id,
+            char *message = autoSprintf( "CU\n%d 1 %s_%s_%s\n#", targetP->id,
                                          getCurseWord( inPlayer->email,
                                                        targetP->email, 0 ),
                                          getCurseWord( inPlayer->email,
-                                                       targetP->email, 1 ) );
+                                                       targetP->email, 1 ),
+                                         getCurseWord( inPlayer->email,
+                                                       targetP->email, 2 ) );
             sendMessageToPlayer( inPlayer,
                                  message, strlen( message ) );
             delete [] message;
@@ -8807,6 +8819,51 @@ char getForceSpawn( char *inEmail, ForceSpawnRecord *outRecordToFill ) {
 
 
 
+static char getForceBoy( char *inEmail ) {
+    char *cont = SettingsManager::getSettingContents( "forceBoyAccounts" );
+    
+    if( cont == NULL ) {
+        return false;
+        }
+    int numParts;
+    char **lines = split( cont, "\n", &numParts );
+
+    delete [] cont;
+    
+    char found = false;
+
+    for( int i=0; i<numParts; i++ ) {
+        
+        if( strstr( lines[i], inEmail ) == lines[i] ) {
+            // matches email
+
+            char emailBuff[100];
+            
+            int on = 0;
+            
+            sscanf( lines[i], "%99s %d", emailBuff, &on );
+
+            if( on == 1 &&
+                strcmp( inEmail, emailBuff ) == 0 ) {
+                
+                found = true;
+                break;
+                }
+            }
+        
+        }
+    
+    for( int i=0; i<numParts; i++ ) {
+        delete [] lines[i];
+        }
+    delete [] lines;
+
+    return found;
+    }
+
+
+
+
 static void makeOffspringSayMarker( int inPlayerID, int inIDToSkip ) {
     
     LiveObject *playerO = getLiveObject( inPlayerID );
@@ -10006,6 +10063,10 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
         }
 
 
+    char forceBoy = getForceBoy( inEmail );
+    
+    
+
 
 
     newObject.parentChainLength = 1;
@@ -10331,6 +10392,12 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                 if( famMothers + famGirls < min ||
                     famGirls == 0 ) {
                     forceGirl = true;
+
+                    if( forceBoy ) {
+                        // override
+                        // never let forced-boy accounts be girls
+                        forceGirl = false;
+                        }
                     }
                 }
             }
@@ -10440,7 +10507,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
                 if( childRace == parentRace ) {
                     newObject.displayID = getRandomFamilyMember( 
                         parentRace, parent->displayID, familySpan,
-                        forceGirl );
+                        forceGirl, forceBoy );
                     }
                 else {
                     newObject.displayID = 
@@ -18357,7 +18424,7 @@ static GridPos getAveragePopulationPos(
 
 
 
-int main() {
+int main( int inNumArgs, const char **inArgs ) {
     useMainSettings();
     
     if( checkReadOnly() ) {
@@ -18390,6 +18457,25 @@ int main() {
 
     AppLog::setLoggingLevel( Log::DETAIL_LEVEL );
     AppLog::printAllMessages( true );
+    
+
+    char forceRebuilding = false;
+    
+    if( inNumArgs > 1 && strcmp( inArgs[1], "rebuild" ) == 0 ) {
+        forceRebuilding = true;
+        
+        printf( "\n" );
+        AppLog::info( "'rebuild' argument present, "
+                      "forcing rebuild of caches." );
+        }
+    else {
+        printf( "\n" );
+        AppLog::info( "Run with this argument to force-rebuild caches:  "
+                      "rebuild" );
+        }
+    
+
+
 
     printf( "\n" );
     AppLog::info( "Server starting up" );
@@ -18664,8 +18750,62 @@ int main() {
     
     initPeriodicPlacements();
 
+    
+    if( forceRebuilding ) {
+        
+        File animDir( NULL, "animations" );
+        
+        if( animDir.exists() ) {
+            File *cacheFile = animDir.getChildFile( "cache.fcz" );
+            
+            cacheFile->remove();
+            
+            delete cacheFile;
+            }
+        
+        
+        File objectDir( NULL, "objects" );
+        
+        if( objectDir.exists() ) {
+            File *cacheFile = objectDir.getChildFile( "cache.fcz" );
+            
+            cacheFile->remove();
+            
+            delete cacheFile;
+            }
+        
+        
+        File catDir( NULL, "categories" );
+        
+        if( catDir.exists() ) {    
+            File *cacheFile = catDir.getChildFile( "cache.fcz" );
+            
+            cacheFile->remove();
+            
+            delete cacheFile;
+            }
+        
+
+        File transDir( NULL, "transitions" );
+        
+        if( transDir.exists() ) {
+            File *cacheFile = transDir.getChildFile( "cache.fcz" );
+            
+            cacheFile->remove();
+            
+            delete cacheFile;
+            }
+        }
+
 
     char rebuilding;
+
+    // NOTE:
+    // While server itself doesn't use animation bank, and animation folder
+    // isn't even present in server folder, server still needs to init an
+    // (empty) animationBank because objectBank expects it to be there
+    // during some if its initialization.  This is effectively an empty
+    // animation bank, but this allows the calls in objectBank to still work.
 
     initAnimationBankStart( &rebuilding );
     while( initAnimationBankStep() < 1.0 );
@@ -23179,14 +23319,17 @@ int main() {
                                 
                                 char *message = 
                                     autoSprintf( 
-                                        "CU\n%d 0 %s_%s\n#", 
+                                        "CU\n%d 0 %s_%s_%s\n#", 
                                         otherToForgive->id,
                                         getCurseWord( nextPlayer->email,
                                                       otherToForgive->email, 
                                                       0 ),
                                         getCurseWord( nextPlayer->email,
                                                       otherToForgive->email, 
-                                                      1 ) );
+                                                      1 ),
+                                        getCurseWord( nextPlayer->email,
+                                                      otherToForgive->email, 
+                                                      2 ) );
                                 sendMessageToPlayer( nextPlayer,
                                                      message, 
                                                      strlen( message ) );
@@ -23231,7 +23374,7 @@ int main() {
                                         
                                         char *message = 
                                             autoSprintf( 
-                                                "CU\n%d 0 %s_%s\n#", 
+                                                "CU\n%d 0 %s_%s_%s\n#", 
                                                 otherToForgive->id,
                                                 getCurseWord( 
                                                     nextPlayer->email,
@@ -23239,7 +23382,11 @@ int main() {
                                                 getCurseWord( 
                                                     nextPlayer->email,
                                                     otherToForgive->email, 
-                                                    1 ) );
+                                                    1 ),
+                                                getCurseWord( 
+                                                    nextPlayer->email,
+                                                    otherToForgive->email, 
+                                                    2 ) );
                                         sendMessageToPlayer( 
                                             nextPlayer,
                                             message, strlen( message ) );
@@ -27143,6 +27290,10 @@ int main() {
                         // include as negative of ID
                         killerID = - nextPlayer->deathSourceID;
                         }
+                    else if( nextPlayer->rodeRocket ) {
+                        // completed rocket ride
+                        killerID = -999999999;
+                        }
                     // never have suicide in this case
 
                     logDeath( nextPlayer->id,
@@ -27223,12 +27374,14 @@ int main() {
                         otherPlayer->curseStatus.curseLevel == 0 ) {
 
                         char *message = autoSprintf( 
-                            "CU\n%d 1 %s_%s\n#",
+                            "CU\n%d 1 %s_%s_%s\n#",
                             nextPlayer->id,
                             getCurseWord( otherPlayer->email,
                                           nextPlayer->email, 0 ),
                             getCurseWord( otherPlayer->email,
-                                          nextPlayer->email, 1 ) );
+                                          nextPlayer->email, 1 ),
+                            getCurseWord( otherPlayer->email,
+                                          nextPlayer->email, 2 ) );
                         
                         sendMessageToPlayer( otherPlayer,
                                              message, strlen( message ) );
@@ -27394,7 +27547,8 @@ int main() {
                     killerID = nextPlayer->id;
                     }
                 else if( nextPlayer->rodeRocket ) {
-                    killerID = -999999999;
+                    // rocket interrupted by error
+                    killerID = -999999998;
                     }
                 
                 char male = ! getFemale( nextPlayer );
@@ -29914,11 +30068,13 @@ int main() {
                         }
                     
 
-                    char *line = autoSprintf( "%d %d %s_%s\n", o->id, level,
+                    char *line = autoSprintf( "%d %d %s_%s_%s\n", o->id, level,
                                               getCurseWord( nextPlayer->email,
                                                             o->email, 0 ),
                                               getCurseWord( nextPlayer->email,
-                                                            o->email, 1 ) );
+                                                            o->email, 1 ),
+                                              getCurseWord( nextPlayer->email,
+                                                            o->email, 2 ) );
                     cursesWorking.appendElementString( line );
                     delete [] line;
                     
