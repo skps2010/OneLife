@@ -59,6 +59,7 @@
 #include "arcReport.h"
 #include "curseDB.h"
 #include "trustDB.h"
+#include "curseLog.h"
 #include "specialBiomes.h"
 #include "cravings.h"
 #include "offspringTracker.h"
@@ -243,6 +244,9 @@ static SimpleVector<char*> youForgivingPhrases;
 
 static SimpleVector<char*> trustingPhrases;
 static SimpleVector<char*> youTrustingPhrases;
+
+static SimpleVector<char*> distrustingPhrases;
+static SimpleVector<char*> youDistrustingPhrases;
 
 
 static SimpleVector<char*> youGivingPhrases;
@@ -805,6 +809,11 @@ typedef struct LiveObject {
 
         // time when this player actually died
         double deathTimeSeconds;
+        
+        // only check for ghost chance once
+        // so we don't check for it again during every computeAge call after 
+        // age 60.
+        char alreadyCheckedGhostChance;
         
         char isGhost;
         char ghostDestroyed;
@@ -2701,6 +2710,9 @@ void quitCleanup() {
 
     trustingPhrases.deallocateStringElements();
     youTrustingPhrases.deallocateStringElements();
+
+    distrustingPhrases.deallocateStringElements();
+    youDistrustingPhrases.deallocateStringElements();
     
     youGivingPhrases.deallocateStringElements();
     namedGivingPhrases.deallocateStringElements();
@@ -4070,7 +4082,8 @@ double computeAge( LiveObject *inPlayer ) {
     if( age >= forceDeathAge ) {
         
         
-        if( ! inPlayer->ghostDestroyed && 
+        if( ! inPlayer->alreadyCheckedGhostChance &&
+            ! inPlayer->ghostDestroyed && 
             ! inPlayer->isGhost &&
             SettingsManager::getIntSetting( "allowGhosts", 0 ) &&
             SettingsManager::getDoubleSetting( "ghostChance", 0.0 ) >=
@@ -4079,6 +4092,7 @@ double computeAge( LiveObject *inPlayer ) {
             // player reached old age, and ghosts allowed, keep them around
             // as a surviving ghost for now
 
+            inPlayer->alreadyCheckedGhostChance = true;
             inPlayer->isGhost = true;
             
             newGhostPlayers.push_back( inPlayer->id );
@@ -4093,7 +4107,11 @@ double computeAge( LiveObject *inPlayer ) {
 
             return forceDeathAge;
             }
-
+        
+        // they didn't become a ghost, for whatever reason
+        // don't check if they become a ghost ever again
+        // (in future computeAge calls after age forceDeathAge)
+        inPlayer->alreadyCheckedGhostChance = true;
 
         // else they died of old age, or their surviving ghost was finally
         // destroyed
@@ -9394,6 +9412,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
     newObject.trueStartTimeSeconds = Time::getCurrentTime();
     newObject.lifeStartTimeSeconds = newObject.trueStartTimeSeconds;
     
+    newObject.alreadyCheckedGhostChance = false;
     newObject.isGhost = false;
     newObject.ghostDestroyed = false;
 
@@ -13385,6 +13404,19 @@ char isYouTrustingSay( char *inSaidString ) {
 char *isNamedTrustingSay( char *inSaidString ) {
     return isNamingSay( inSaidString, &trustingPhrases );
     }
+
+
+
+char isYouDistrustingSay( char *inSaidString ) {
+    return isWildcardGivingSay( inSaidString, &youDistrustingPhrases );
+    }
+
+// returns pointer into inSaidString
+char *isNamedDistrustingSay( char *inSaidString ) {
+    return isNamingSay( inSaidString, &distrustingPhrases );
+    }
+
+
 
 
 char isForgiveEveryoneSay( char *inSaidString ) {
@@ -18619,6 +18651,9 @@ int main( int inNumArgs, const char **inArgs ) {
     readPhrases( "trustingPhrases", &trustingPhrases );
     readPhrases( "trustYouPhrases", &youTrustingPhrases );
 
+    readPhrases( "distrustingPhrases", &distrustingPhrases );
+    readPhrases( "distrustYouPhrases", &youDistrustingPhrases );
+
     
     readPhrases( "youGivingPhrases", &youGivingPhrases );
     readPhrases( "namedGivingPhrases", &namedGivingPhrases );
@@ -21034,6 +21069,12 @@ int main( int inNumArgs, const char **inArgs ) {
                         nextPlayer->preVogPos = getPlayerPos( nextPlayer );
                         nextPlayer->preVogBirthPos = nextPlayer->birthPos;
                         nextPlayer->vogJumpIndex = 0;
+
+                        if( nextPlayer->pathToDest != NULL ) {
+                            delete [] nextPlayer->pathToDest;
+                            nextPlayer->pathToDest = NULL;
+                            }
+                        nextPlayer->pathLength = 0;
                         }
                     }
                 else if( m.type == VOGN ) {
@@ -21171,16 +21212,28 @@ int main( int inNumArgs, const char **inArgs ) {
                 else if( m.type == VOGT && m.saidText != NULL ) {
                     if( nextPlayer->vogMode ) {
                         
-                        newLocationSpeech.push_back( 
-                            stringDuplicate( m.saidText ) );
-                        GridPos p = getPlayerPos( nextPlayer );
-                        
-                        ChangePosition cp;
-                        cp.x = p.x;
-                        cp.y = p.y;
-                        cp.global = false;
+                        if( strcmp( m.saidText, "TP" ) == 0 ) {
 
-                        newLocationSpeechPos.push_back( cp );
+                            nextPlayer->preVogPos.x = nextPlayer->xs;
+                            nextPlayer->preVogPos.y = nextPlayer->ys;
+                            
+                            nextPlayer->preVogBirthPos.x = nextPlayer->xs;
+                            nextPlayer->preVogBirthPos.y = nextPlayer->ys;
+                            // hide TP speech, don't show it as location
+                            // speech
+                            }
+                        else {
+                            newLocationSpeech.push_back( 
+                                stringDuplicate( m.saidText ) );
+                            GridPos p = getPlayerPos( nextPlayer );
+                            
+                            ChangePosition cp;
+                            cp.x = p.x;
+                            cp.y = p.y;
+                            cp.global = false;
+                            
+                            newLocationSpeechPos.push_back( cp );
+                            }
                         }
                     }
                 else if( m.type == VOGX ) {
@@ -21197,6 +21250,22 @@ int main( int inNumArgs, const char **inArgs ) {
                         
                         nextPlayer->birthPos = nextPlayer->preVogBirthPos;
 
+                        nextPlayer->heldOriginX = nextPlayer->preVogPos.x;
+                        nextPlayer->heldOriginY = nextPlayer->preVogPos.y;
+
+                        nextPlayer->actionTarget = p;
+                        
+                        
+                        // always assume teleport at end of VOG
+                        // treat it like a flight
+                        FlightDest fd = {
+                            nextPlayer->id,
+                            p };
+
+                        newFlightDest.push_back( fd );
+
+                        nextPlayer->inFlight = true;
+                        
                         // send them one last VU message to move them 
                         // back instantly
                         char *message = autoSprintf( "VU\n%d %d\n#",
@@ -23417,6 +23486,39 @@ int main( int inNumArgs, const char **inArgs ) {
                             setDBTrust( nextPlayer->id,
                                         nextPlayer->email, 
                                         otherToTrust->email );
+                            }
+
+
+                        
+                        LiveObject *otherToDistrust = NULL;
+                        
+                        if( isYouDistrustingSay( m.saidText ) ) {
+                            otherToDistrust = 
+                                getClosestOtherPlayer( nextPlayer );
+                            }
+                        else {
+                            char *distrustName = 
+                                isNamedDistrustingSay( m.saidText );
+                            
+                            if( distrustName != NULL ) {
+                                otherToDistrust =
+                                    getPlayerByName( distrustName, nextPlayer );
+                                
+                                }
+                            }
+                        
+                        if( otherToDistrust != NULL ) {
+                            clearDBTrust( nextPlayer->email, 
+                                          otherToDistrust->email );
+                            // log here....
+                            // setDBTrust abvoe does logging
+                            // but clearDBTrust does not, because we clear
+                            // it on cursing, too.
+                            // We want to log distrust even distinctly from
+                            // cursing.
+                            logDistrust( nextPlayer->id,
+                                         nextPlayer->email, 
+                                         otherToDistrust->email );
                             }
 
                         

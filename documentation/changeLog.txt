@@ -105,6 +105,36 @@ Server Fixes:
 
 --New pullAndBuilTestSystemAHAP.sh script.  Fixes #1142
 
+--VOG now has a TP speech command to teleport the underlying character after
+  VOG mode ends.
+
+--Extensive persistent logging around Eve placement to see if we can figure out
+  why Eve spawn locations aren't resetting after the apocalypse.  Part of #1135
+
+--Finally found cause of persistent Eve location after apocalypse (we were
+  bootstrapping even location, as a last-ditch effort, basted on monument
+  logs).  Part of #1135
+
+--Fixed two bugs in tallying content leader votes.
+
+--Fixed fitness server to allow relation names longer than 254 characters (for
+  long chains of great great greats when families survive for a long time).
+
+--Fixed so that we only check if a player becomes a ghost ONCE after age 60.
+  Old code would re-check with every computeAge call after age 60, assuming
+  that only one such call would occur.  But there are lots of places that can
+  trigger checkAge to be called again, which was resulting in a greater-than-
+  desired frequency of players becoming ghosts (and opening up an exploit
+  where modded clients could spam actions that trigger checkAge right around
+  age 60 to increase their ghost chance).  Thanks selb.
+
+--Added new DISTRUST command to remove TRUST.  Invoked with I DISTRUST YOU, to
+  target the closest person, or I DISTRUST EVE JONES to target by name.
+  Before, you had to curse someone to remove trust.
+
+
+
+
 
 
 Version 428    2024-July-11
