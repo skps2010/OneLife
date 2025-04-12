@@ -112,6 +112,7 @@ jobs:
         run: |
           /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           brew install sdl12-compat
+          brew install ImageMagick
       - name: scripts
         run: |
           wget https://raw.githubusercontent.com/skps2010/OneLife/master/scripts/skps2010Scripts/skps2010Build.sh
