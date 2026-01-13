@@ -106,7 +106,7 @@ jobs:
           asset_content_type: application/zip
   build_macos:
     needs: build_windows
-    runs-on: macos-13
+    runs-on: macos-14
     steps:
       - name: packages
         run: |
