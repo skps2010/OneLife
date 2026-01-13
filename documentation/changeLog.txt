@@ -3,6 +3,263 @@ This file only list changes to game code.  Changes to content can be found here:
 http://onehouronelife.com/updateLog.php
 
 
+Server Fixes:
+
+--Fixed so that periodic placements only go in empty spots and never replace an
+  existing map object.
+
+--Support for object that can +giveClue when it is created by a player through
+  a transition (instead of just if the player is holding it and causing a
+  victim emote in someone else).
+
+--Fixed so that ghosts are ignored for nearPop stuff, periodic placements, and
+  Eve placements.
+
+
+
+
+Version 434    2025-November-11
+
+--Whoops.  Obliterated the GRAVE_OLD case in LivingLifePage when I created the
+  new STATUE_INFO case.  Restored that GRAVE_OLD code.
+
+
+
+
+Version 432    2025-November-11
+
+--Added better message after hitting the AHAP VOTE button.  Vote isn't
+  submitted until you log in to the game.
+
+--Fixed binFolderCache to use dataVersionNumber in cache file name instead of
+  overall version number, which fixes a state binCache issue on AHAP.  AHAP was
+  stuck at bin caches with the name bin_v430_cache.fcz.  Now they are correctly
+  named bin_v59_cache.fcz, matching the dataVersionNumber.  Also, this improves
+  behavior for OHOL, which doesn't need to rebuild the bin caches when only the
+  client binary version number changes.  Fixes #1122
+
+--Updated to latest stb_vorbis code to fix some bugs and vulnerabilities.
+  Thanks npt-1707.  Fixes #1175 Fixes #1177
+
+--Life token message hidden from login screen as long as user has 5 or more
+  lives left.  Don't bother them with this info, because life token limit
+  usually has no impact these days (limit is so high at 48).  Thanks Twisted.
+  Part of #1121
+
+--Added tooltip for SERVICES button on login screen.  Part of #1121
+
+--Made LOGIN button yellow to make it stand out more.  Part of #1121
+
+--Fixed so that animations with forceZeroStart set for moving objects force the
+  animation to start at the beginning each time the object starts or stops
+  moving.  This also allows a sound to play when the object starts or stops
+  moving.  To have a sound play ONLY when an object starts or stops moving,
+  give that sound a repeat frequency of 0 Hz and a phase of 0.  Note that in
+  the previous codebase, sounds with 0 Hz repeat frequencies would never play.
+  Now 0 Hz as a setting has a purpose (to have the sound play exactly once,
+  at the start of the animation).  Thanks DopiePanda.  Part of #1127
+
+--Fixed Animation Editor to correctly set ForceZeroStart and RandomStartPhase
+  checkboxes when switching back and forth between different animation slots
+  for a give object (moving, ground, etc.).  Before, these boxes were only
+  being correctly set when switching objects with the object picker.
+
+--Blacklisted !WORD now handles repeated last letters correctly, when before
+  they would slip through.  WORDDD now maps to XXXXXX where it used to 
+  incorrectly map to XXXXDD.  Fixes #1144
+
+--Fixed case where swapping an object with another on a table causes the
+  now-held object to go through a transiton (like the pickup transition for a
+  goose or rubber ball).  Before, this caused the creation sound of the
+  now-on-the-table object to get played (like the creation sound of a knife or
+  a pie that is now swapped onto the table).  Thanks QuirkySmirkyIan
+  Fixes #1162
+
+--The client auto-applies a global map offset if the first map chunk's
+  coordinates sent by the server are > 16536, to avoid floating point rounding
+  errors in coordinates on GPUs that use 32-bit floats.  There were several 
+  places client-side where this offset was not being correctly applied.  The 
+  first map chunk is relative to a player's birth location, so it will only 
+  have large coordinates if the player reconnects mid-life after travelling a 
+  great distance before reconnecting.  In this case, a bunch of things (like 
+  maps, owner positions, baby positions, etc.) were off.  Usually only ghosts 
+  travel very far before dying, but this bug actually affected anyone who made 
+  a long trip and then disconnected and reconnected.  Note that if you're
+  taking VERY long trips in one lifetime, you may start to see GPU sprite 
+  positioning glitches, as the rounding errors creep in.  If you're a ghost, 
+  and this is bothering you, reconnecting should fix it now.  But the bugs that
+  occurred in coordinates after reconnecting at a great distance are fixed now.
+  Note that GPU rounding issues are already handled by long-distance flights,
+  which update your birth position, making all future coordinates sent by the
+  server relative to where you land.  Fixes #1166
+
+--Changed default log file name from log.txt to gameLog.txt.  This avoids
+  conflicting with the OHOL server, which outputs log.txt, and might be running
+  in the same folder.  Part of #1180
+
+--Build scripts for Windows and Mac now copy server settings into 
+  serverSettings and also copy several server .txt files.  Fixes #1181
+
+--regenerateCaches fixed to use a real dataVersionNumber.
+
+--Using %lf format specifier for a double in vsnprintf was producing crashes
+  and other undefined behavior Windows via the MinGW gcc implementation, which
+  perhaps does not support C99's introduction of %lf for printf-family
+  functions.  Replaced all of thse with %f for both client and server code.
+  %lf is for scanf-family functions only.  Seems to be the cause of #1182.
+
+
+
+
+Server Fixes:
+
+--Lineage server only keeps most recent 10,000 log entries.
+
+--Logging all slow queries in lineage server.
+
+--Anti-DOS script running on lineage server to block IP addresses making more
+  than 2000 requests per day (several bots were making 50,000 requests per
+  day).  OHOL game servers are whitelisted.
+
+--No longer allowing vague lineage name searches that match 30,000 lives,
+  since this was too slow. Limiting name searches to specific names that
+  don't match more than 1000 lives.  
+
+--Fixed a major slowdown bug when vague name search matches too many lineage
+  server entries (custom filter was set, preventing generation=1 for the deep
+  roots lists).
+
+--Sever no longer accepts LOGIN messages with twin_counts of 0 or 1, and
+  instead counts these as ordinary non-twin logins.  This was a bug in the
+  server code being used by modded clients to force-end adult lives and get
+  reborn.
+
+--Fixed so that parallel lineage server requests (logging deaths) for the same
+  email address force incremental sequence numbers as each request is resolved
+  and finally goes through (before, parallel requests could end up using the
+  same sequence number, causing the later requests to be rejected).
+
+--Added function in back-end admin interface for re-computing lineage depth for
+  a given life (up and down) in lineage server.  Will let me patch up the depth
+  of the Cat family.
+
+--Fixed behavior of sub-containers when something in the main container decays
+  away to nothing, leaving a gap.  Before, the sub-container filling the gap
+  (sliding into place) would forget its sub-items but those items would still
+  be stuck in the database for that slot. A new sub-container inserted into
+  that slot would pick up those items.  This could be repeated to eventually
+  get a container with an arbitrary number of items, way over its specified
+  capacity.  Fixes #1170
+
+--Added lineage server index on ( eve_life_id, death_time ) to make finding old
+  lives that don't match one of the record-breaking eve lines faster.
+
+--New server at oldlineage.onehouronelife.com which has a historical archive of
+  the 11 million lives that were lived during the first 7 years of OHOL.  The
+  main family tree server now maintains only the last 365 days of lives, plus
+  all lives from the top-ten longest-line families.  This speeds up the family
+  tree server dramatically, which was so bogged by 4+ GB of data that it was
+  sometimes timing out when game servers tried to add new lives.  An hourly
+  cron job now purges lives that are more than a year old that aren't part of a
+  top-ten family.
+
+--Fixed a new bug with decaying items in sub-containers, caused by the previous
+  fix.  An item in a sub container that decays was causing all items in the
+  other sub-containers in the same super-container to disappear.
+
+--Fixed bug where etaDecay time of held object wasn't update if object does a
+  self-to-self moving transition while held.  This resulted in the same
+  transititon being triggered over and over endlessly every server frame,
+  freezing the player and spamming updates to all other players on the server.
+  Part of #1124
+
+--Fixed so that removing object contained in worn clothing correctly applies
+  bare-hand transition (pick up transition), and inserting held object into
+  worn clothing correctly applies use-on-ground transition (put down
+  transition).  Part of #1124
+
+--Fixed Unix pull-and-build script to link contentSettings.  Thanks 
+  InTheMorning.  Fixes #1163 Fixes #1164
+
+--Killer ID and email now included in lifeLog for whoever exorcises a ghost.
+  Fixes #1165
+
+--Max radio distance is now 10M (was 100K).  Still too far for spam from 
+  Donkeytown, which is 200M away.  Fixes #1172
+
+--HungryWork now correctly applies to floor objects.
+
+--Periodic Placements now support randomization intervals (like every 5 hours,
+  +/- 1 hour).  Part of #1174
+
+--Support for Eve to start her life holding an object with new contentSetting
+  eveStartsHolding.ini.  Allows AHAP Eve to start game flying around in a
+  rocket ship to pick place to land.  Fixes #1179
+
+--Server now uses serverSettings folder (instead of settings) if it exists, but
+  defaults to using settings if serverSettings does not exist.  Part of #1181
+
+--DING message now sent to players within radius of 100 when one player wounds
+  another player, giving the name of the killer, the victim, and the murder
+  weapon.  Fixes #1183
+
+--Fixed so that you can't feed drugs to anyone, since it's too confusing
+  (before, there was a missed case where you could feed drugs to the elderly).
+  Part of #1185
+
+--Got rid of weird case in server code that allowed UBABY when holding non-food
+  (or empty handed) on elderly to put clothing on them or swap their clothing,
+  since this wasn't working in the vanilla client anyway, and it could be used
+  to steal backpacks, etc.  Part of #1185
+
+--Fixed missing check that player actually has another player cursed before
+  carrying out the FORGIVE action sever-side, which returns their curse name.
+  This allowed people to spam FORGIVE actions for everyone to determine to
+  curse name for everyone, even for people that they had never cursed.  Curses
+  are supposed to be limited and used only when necessary.  Other players who
+  are not cursed are supposed to be anonymous.  Fixes #1185
+
+--During shutdown, when considering position of longest lineage for Eve
+  location at next server startup, we no longer consider ghost players, who
+  can walk very far afield.  Fixes #1188
+
+--Fixed to require a space after a naming phrase, to avoid bad case of
+  I AM EVERHARD matching the I AM EVE naming phrase, making the last name
+  RHARD.  Fixes #1194
+
+--ahapGate now keeps same content leader as before in the event of a tie vote.
+  Fixes #1196
+
+--Fixed a missing parameter bug in ahapGate.
+
+--maxFlightDistance pushed from 10,000 up to 500,000.  Tutorials are put
+  1,000,000 away, and Donkeytown is 200,000,000 away, so this allows much
+  longer-distance flight without allowing flilghts into tutorial or d-town.
+
+--Fixed so that we don't ignore landing pads closer than 250 manhattan distance
+  if there are no pads further out.  Before, if the only pads were closer than
+  250, you'd annoyingly land at the pad closest to you, regardless of flight
+  direction.  Now, if all pads are closer than 250, you will land at the
+  closest one in the flight direction.  Fixes #1198
+
+--Ghosts are now ignored when finding closest expert for waystone.  Fixes #1199
+
+--Ghosts are now ignored when picking heir for property.  Part of #1201
+
+--Ghosts now stop being leaders when they become ghosts.  Ghosts are no longer
+  considered to inherit leadership.  Final part of #1201
+
+--Ghosts no longer counted in countLivingPlayers(), and countLivingPlayers()
+  used to toggle special biomes instead of just raw player count.  Some other
+  things (like Languages), still depend on raw player count.  Fixes #1202
+
+--forceSpawnAccounts.ini now supports 2 switch for forcing player to be born as
+  baby with specific displayID.  Forced-spawn players now have their forced
+  name transmitted correctly upon spawning.
+
+--Ghosts no longer earn curse tokens.  Fixes #1210
+
+
 
 
 Version 430    2025-January-13

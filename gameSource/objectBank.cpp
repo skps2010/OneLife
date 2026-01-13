@@ -977,6 +977,24 @@ static void setupRideRocket( ObjectRecord *inR ) {
     }
 
 
+static void setupStatue( ObjectRecord *inR ) {
+    inR->isStatue = false;    
+    inR->overlayID = 0;
+    
+    char *pos = strstr( inR->description, "+statue" );
+
+    if( pos != NULL ) {
+        inR->isStatue = true;
+        }
+    
+    pos = strstr( inR->description, "+overlay" );
+
+    if( pos != NULL ) {
+        sscanf( pos, "+overlay%d", &( inR->overlayID ) );
+        }
+    }
+
+
 
 static void setupNearPop( ObjectRecord *inR ) {
     inR->nearPop = false;    
@@ -1255,6 +1273,7 @@ ObjectRecord *scanObjectRecordFromString( const char *inString ) {
         setupNeverDrop( r );
         setupGiveClue( r );
         setupRideRocket( r );
+        setupStatue( r );
         setupNearPop( r );
         setupContainOffset( r );
                 
@@ -4291,6 +4310,7 @@ int addObject( const char *inDescription,
     setupNeverDrop( r );
     setupGiveClue( r );
     setupRideRocket( r );
+    setupStatue( r );
     setupNearPop( r );
     setupContainOffset( r );
     

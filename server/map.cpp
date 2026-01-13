@@ -390,6 +390,13 @@ static DB metaDB;
 static char metaDBOpen = false;
 
 
+static DB statueDB;
+static char statueDBOpen = false;
+
+static DB statueTimeDB;
+static char statueTimeDBOpen = false;
+
+
 
 static int randSeed = 124567;
 //static JenkinsRandomSource randSource( randSeed );
@@ -1138,8 +1145,10 @@ static int computeMapBiomeIndex( int inX, int inY,
 
 
 
+
 // old code, separate height fields per biome that compete
 // and create a patchwork layout
+/*
 static int computeMapBiomeIndexOld( int inX, int inY, 
                                  int *outSecondPlaceIndex = NULL,
                                  double *outSecondPlaceGap = NULL ) {
@@ -1211,7 +1220,7 @@ static int computeMapBiomeIndexOld( int inX, int inY,
     
     return pickedBiome;
     }
-
+*/
 
 
 
@@ -3983,7 +3992,100 @@ char initMap() {
     
 
 
+
+    error = DB_open( &statueDB, 
+                     "statue.db", 
+                     KISSDB_OPEN_MODE_RWCREAT,
+                     // starting size doesn't matter here
+                     500,
+                     8, // two 32-bit ints, xy
+                     MAP_STATUE_DATA_LENGTH
+                     );
     
+    if( error ) {
+        AppLog::errorF( "Error %d opening statue KissDB", error );
+        return false;
+        }
+    
+    statueDBOpen = true;
+    
+
+    error = DB_open( &statueTimeDB, 
+                     "statueTime.db", 
+                     KISSDB_OPEN_MODE_RWCREAT,
+                     // starting size doesn't matter here
+                     500,
+                     8, // two 32-bit ints, xy
+                     8  // one 64-bit double, representing an ETA time
+                        // in whatever binary format and byte order
+                        // "double" on the server platform uses
+                     );
+    
+    if( error ) {
+        AppLog::errorF( "Error %d opening statueTime KissDB", error );
+        return false;
+        }
+    
+    statueTimeDBOpen = true;
+
+
+
+    // populate statueDB from file, if it exists
+    const char *statueFileName = "statueForceLoad.txt";
+    
+    FILE *statueLoadFile = fopen( statueFileName, "r" );
+
+    if( statueLoadFile != NULL ) {
+        char buffer[ MAP_STATUE_DATA_LENGTH ];
+        memset( buffer, 0, MAP_STATUE_DATA_LENGTH );
+
+        int linesLoaded = 0;
+        
+        while( true ) {
+            // format:
+            //  x,y,statue_time#
+            // followed by rest of line which is database entry string
+            int x, y;
+            double statueTime;
+            
+            int numRead = fscanf( statueLoadFile, "%d,%d,%lf#", 
+                                  &x, &y,
+                                  &statueTime );
+            
+            if( numRead != 3 ) {
+                break;
+                }
+            
+            char *read = fgets( buffer, sizeof( buffer ), statueLoadFile );
+
+            if( read == NULL ) {
+                // failed to read line
+                break;
+                }
+
+            // terminate at first newline character (don't include them)
+            int c = 0;
+            while( read[c] != '\0' ) {
+                if( read[c] == '\n' || read[c] == '\r' ) {
+                    read[c] = '\0';
+                    break;
+                    }
+                c++;
+                }
+            
+            addStatueData( x, y, statueTime, buffer );
+            linesLoaded++;
+            }
+        
+        printf( "Added %d lines of statue data from statueForceLoad.txt\n",
+                linesLoaded );
+        
+        fclose( statueLoadFile );
+        }
+    
+
+
+
 
 
     if( lookTimeDBEmpty && cellsLookedAtToInit > 0 ) {
@@ -4447,6 +4549,44 @@ char initMap() {
         delete specialPlacements;
         }
     
+
+    useContentSettings();
+    int statueObjectID = SettingsManager::getIntSetting( "statueObject", 0 );
+    useMainSettings();
+    
+    if( statueObjectID > 0 ) {
+        // make sure there is a statue base object at every location
+        // in the map that we have statue data for
+
+        // fixme
+        DB_Iterator dbi;
+    
+    
+        DB_Iterator_init( &statueDB, &dbi );
+    
+        unsigned char key[8];
+    
+        unsigned char value[MAP_STATUE_DATA_LENGTH];
+
+        int numSet = 0;
+        while( DB_Iterator_next( &dbi, key, value ) > 0 ) {
+            int x = valueToInt( key );
+            int y = valueToInt( &( key[4] ) );
+            
+            setMapObjectRaw( x, y, statueObjectID );
+
+            numSet++;
+            }
+
+        AppLog::infoF( "Placed %d statue bases in map.", numSet );
+        }
+    else {
+        AppLog::info( "No statueObject set in contentSettings, "
+                      "not placing any statue bases in map." );
+        }
+    
+
+
     
     reseedMap( false );
         
@@ -4787,6 +4927,14 @@ void freeMap( char inSkipCleanup ) {
         metaDBOpen = false;
         }
     
+    if( statueDBOpen ) {
+        DB_close( &statueDB );
+        statueDBOpen = false;
+        }
+    if( statueTimeDBOpen ) {
+        DB_close( &statueTimeDB );
+        statueTimeDBOpen = false;
+        }
 
     writeEveRadius();
     writeEveLocation();
@@ -4845,6 +4993,7 @@ void wipeMapFiles() {
     deleteFileByName( "mapTime.db" );
     deleteFileByName( "playerStats.db" );
     deleteFileByName( "meta.db" );
+
     
     deleteFileByName( "mapDummyRecall.txt" );
     deleteFileByName( "lastEveLocation.txt" );
@@ -6257,9 +6406,13 @@ void checkDecayContained( int inX, int inY, int inSubCont ) {
     
     SimpleVector<int> newContained;
     SimpleVector<timeSec_t> newDecayEta;
+
+    // enough room in these for numContained, even though our count
+    // might shrink due to this decay
+    int *newSubContCount = new int[numContained];
+    int **newSubCont = new int*[numContained];
+    timeSec_t **newSubContDecay = new timeSec_t*[numContained];
     
-    SimpleVector< SimpleVector<int> > newSubCont;
-    SimpleVector< SimpleVector<timeSec_t> > newSubContDecay;
     
         
     char change = false;
@@ -6268,14 +6421,37 @@ void checkDecayContained( int inX, int inY, int inSubCont ) {
     // looking it up over and over.
     int lastIDWithNoDecay = 0;
     
+    int nextFillI = 0;
     
     for( int i=0; i<numContained; i++ ) {
+        // set them all to NULL to start, so we know which ones to destroy later
+        newSubContCount[i] = 0;
+        newSubCont[i] = NULL;
+        newSubContDecay[i] = NULL;
+        
+
         int oldID = contained[i];
         
         if( oldID == lastIDWithNoDecay ) {
             // same ID we've already seen before
             newContained.push_back( oldID );
             newDecayEta.push_back( 0 );
+
+            if( inSubCont == 0 &&
+                oldID < 0 ) {
+                // oldID is a sub-container in our main container
+                // preserve what it contains
+                newSubCont[nextFillI] =
+                    getContainedRaw( inX, inY, 
+                                     &( newSubContCount[nextFillI] ),
+                                     i + 1 );
+                newSubContDecay[nextFillI] = 
+                    getContainedEtaDecay( inX, inY, 
+                                          &( newSubContCount[nextFillI] ),
+                                          i + 1 );
+                }
+            
+            nextFillI++;
             continue;
             }
         
@@ -6294,11 +6470,27 @@ void checkDecayContained( int inX, int inY, int inSubCont ) {
             // no auto-decay for this object
             if( isSubCont ) {
                 oldID *= -1;
+                
+                if( inSubCont == 0 ) {    
+                    // oldID is a sub-container in our main container
+                    // preserve what it contains
+                    newSubCont[nextFillI] =
+                        getContainedRaw( inX, inY, 
+                                         &( newSubContCount[nextFillI] ),
+                                         i + 1 );
+                    newSubContDecay[nextFillI] = 
+                        getContainedEtaDecay( inX, inY, 
+                                              &( newSubContCount[nextFillI] ),
+                                              i + 1 );
+                    }
+                
                 }
             lastIDWithNoDecay = oldID;
             
             newContained.push_back( oldID );
             newDecayEta.push_back( 0 );
+            
+            nextFillI++;
             continue;
             }
     
@@ -6370,22 +6562,36 @@ void checkDecayContained( int inX, int inY, int inSubCont ) {
                     // negative IDs indicate sub-containment 
                     newID *= -1;
                     }
+                
+                if( inSubCont == 0 ) {    
+                    // oldID is a sub-container in our main container
+                    // preserve what it contains
+                    newSubCont[nextFillI] =
+                        getContainedRaw( inX, inY, 
+                                         &( newSubContCount[nextFillI] ),
+                                         i + 1 );
+                    newSubContDecay[nextFillI] = 
+                        getContainedEtaDecay( inX, inY, 
+                                              &( newSubContCount[nextFillI] ),
+                                              i + 1 );
+                    }
                 }
             newContained.push_back( newID );
             newDecayEta.push_back( mapETA );
+            nextFillI++;
             }
         }
     
     
     if( change ) {
         int *containedArray = newContained.getElementArray();
-        int numContained = newContained.size();
+        int numNewContained = newContained.size();
 
-        setContained( inX, inY, newContained.size(), containedArray, 
+        setContained( inX, inY, numNewContained, containedArray, 
                       inSubCont );
         delete [] containedArray;
         
-        for( int i=0; i<numContained; i++ ) {
+        for( int i=0; i<numNewContained; i++ ) {
             timeSec_t mapETA = newDecayEta.getElementDirect( i );
             
             if( mapETA != 0 ) {
@@ -6394,11 +6600,47 @@ void checkDecayContained( int inX, int inY, int inSubCont ) {
             
             setSlotEtaDecay( inX, inY, i, mapETA, inSubCont );
             }
+        
+
+        if( inSubCont == 0 ) {
+            // we're checking decay in a top-level container
+            // (don't do this for sub-containers, because we can't
+            // have sub-sub-containers)
+
+            // loop over all old slots to set/clear sub-contained items
+            // we don't want any sub-contained things to linger in slots that
+            // are now empty (when numNewContained < numContained )
+            for( int i=0; i<numContained; i++ ) {
+                if( newSubCont[i] != NULL ) {
+                    setContained( inX, inY, newSubContCount[i], 
+                                  newSubCont[i],
+                                  i + 1 );
+                    setContainedEtaDecay( inX, inY, newSubContCount[i], 
+                                          newSubContDecay[i],
+                                          i + 1 );
+                    }
+                else {
+                    clearAllContained( inX, inY, i + 1 );
+                    }
+                }
+            }
         }
 
     if( contained != NULL ) {
         delete [] contained;
         }
+
+    for( int i=0; i<numContained; i++ ) {
+        if( newSubCont[i] != NULL ) {
+            delete [] newSubCont[i];
+            }
+        if( newSubContDecay[i] != NULL ) {
+            delete [] newSubContDecay[i];
+            }
+        }
+    delete [] newSubContCount;
+    delete [] newSubCont;
+    delete [] newSubContDecay;
     }
 
 
@@ -9708,6 +9950,46 @@ int addMetadata( int inObjectID, unsigned char *inBuffer ) {
 
 
 
+char getStatueData( int inX, int inY, 
+                    timeSec_t *outStatueTime, char *outBuffer ) {
+
+    unsigned char key[8];    
+    intPairToKey( inX, inY, key );
+
+    int result = DB_get( &statueDB, key, (unsigned char *)outBuffer );
+
+    if( result == 0 ) {
+        unsigned char value[8];
+        
+        result = DB_get( &statueTimeDB, key, value );
+        
+        if( result == 0 ) {
+            *outStatueTime = valueToTime( value );
+            return true;
+            }
+        }
+
+    return false;
+    }
+
+
+
+void addStatueData( int inX, int inY, 
+                    timeSec_t inStatueTime, const char *inDataString ) {
+    
+    unsigned char key[8];    
+    intPairToKey( inX, inY, key );
+
+    DB_put( &statueDB, key, (unsigned char *)inDataString );
+    
+    unsigned char value[8];
+    timeToValue( inStatueTime, value );
+    
+    DB_put( &statueTimeDB, key, value );
+    }
+
+
+
 
 void removeLandingPos( GridPos inPos ) {
     for( int i=0; i<flightLandingPos.size(); i++ ) {
@@ -9748,6 +10030,11 @@ GridPos getNextCloseLandingPos( GridPos inCurPos,
     GridPos closestPos;
     double closestDist = DBL_MAX;
 
+    if( flightLandingPos.size() == 0 ) {
+        *outFound = false;
+        return closestPos;
+        }
+    
     double maxDist = SettingsManager::getDoubleSetting( "maxFlightDistance",
                                                         10000 );
     
@@ -9755,39 +10042,55 @@ GridPos getNextCloseLandingPos( GridPos inCurPos,
         maxDist = DBL_MAX;
         }
 
-    for( int i=0; i<flightLandingPos.size(); i++ ) {
-        GridPos thisPos = flightLandingPos.getElementDirect( i );
+    
+    // don't consider landing at spots closer than 250,250 manhattan
+    // to takeoff spot
+    // unless we fail to find one in our first trial
+    // then consider closer spots too
+    int trialMinDist[2] = { 250, 0 };
 
-        if( tooClose( inCurPos, thisPos, 250 ) ) {
-            // don't consider landing at spots closer than 250,250 manhattan
-            // to takeoff spot
-            continue;
-            }
 
+    for( int trial=0; trial<2; trial++ ) {
+        int minDist = trialMinDist[trial];
         
-        if( isInDir( inCurPos, thisPos, inDir ) ) {
-            double dist = distance( inCurPos, thisPos );
+        for( int i=0; i<flightLandingPos.size(); i++ ) {
+            GridPos thisPos = flightLandingPos.getElementDirect( i );
+
+            if( tooClose( inCurPos, thisPos, minDist ) ) {
             
-            if( dist > maxDist ) {
                 continue;
                 }
 
-            if( dist < closestDist ) {
-                // check if this is still a valid landing pos
-                int oID = getMapObject( thisPos.x, thisPos.y );
-                
-                if( oID <=0 ||
-                    ! getObject( oID )->isFlightLanding ) {
-                    
-                    // not even a valid landing pos anymore
-                    flightLandingPos.deleteElement( i );
-                    i--;
+        
+            if( isInDir( inCurPos, thisPos, inDir ) ) {
+                double dist = distance( inCurPos, thisPos );
+            
+                if( dist > maxDist ) {
                     continue;
                     }
-                closestDist = dist;
-                closestPos = thisPos;
-                closestIndex = i;
+
+                if( dist < closestDist ) {
+                    // check if this is still a valid landing pos
+                    int oID = getMapObject( thisPos.x, thisPos.y );
+                
+                    if( oID <=0 ||
+                        ! getObject( oID )->isFlightLanding ) {
+                    
+                        // not even a valid landing pos anymore
+                        flightLandingPos.deleteElement( i );
+                        i--;
+                        continue;
+                        }
+                    closestDist = dist;
+                    closestPos = thisPos;
+                    closestIndex = i;
+                    }
                 }
+            }
+        
+        if( closestIndex != -1 ) {
+            // found, no need for another trial
+            break;
             }
         }
     

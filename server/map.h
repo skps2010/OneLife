@@ -283,6 +283,41 @@ int addMetadata( int inObjectID, unsigned char *inBuffer );
     
 
 
+
+// ascii string data, \0 terminated
+// they can say 88 chars max
+// their name is 31 chars long, max
+// 10 chars per id, 7 of them, 70 chars max
+// age is 10 chars max
+// 10 separators
+// 209 chars max, plus \0 termination
+// 210 is perfect
+//
+// displayID|age|name|
+//           hat|tunic|frontShoe|backShoe|bottom|backpack|
+//           final_words
+// name and final words have spaces replaced with _
+// they are - if either name or final words are blank
+#define MAP_STATUE_DATA_LENGTH 210
+
+// inBuffer must be at least MAP_STATUE_DATA_LENGTH bytes
+// returns true if statue data found
+char getStatueData( int inX, int inY,
+                    timeSec_t *outStatueTime, char *inBuffer );
+
+
+// inDataString can be at most MAP_STATUE_DATA_LENGTH long, including \0
+// termination byte
+void addStatueData( int inX, int inY,
+                    timeSec_t inStatueTime,
+                    const char *inDataString );
+
+
+
+
+
+
+
 // gets speech pipe indices for IN pipes at or adjacent to inX,inY
 // vector passed in through outIndicies will be filled with indices
 void getSpeechPipesIn( int inX, int inY, 

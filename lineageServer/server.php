@@ -151,6 +151,12 @@ else if( $action == "show_data" ) {
 else if( $action == "show_detail" ) {
     ls_showDetail();
     }
+else if( $action == "recompute_depth" ) {
+    ls_recomputeDepth();
+    }
+else if( $action == "recompute_depth_bulk" ) {
+    ls_recomputeDepthBulk();
+    }
 else if( $action == "logout" ) {
     ls_logout();
     }
@@ -162,6 +168,15 @@ else if( $action == "character_page" ) {
     }
 else if( $action == "character_dump" ) {
     ls_characterDump();
+    }
+else if( $action == "purge_prepare" ) {
+    ls_purgePrepare();
+    }
+else if( $action == "purge" ) {
+    ls_purge();
+    }
+else if( $action == "map_ids" ) {
+    ls_mapIDs();
     }
 // disable this one for now, no longer needed
 else if( false && $action == "reformat_names" ) {
@@ -358,9 +373,14 @@ function ls_setupDatabase() {
             "INDEX( user_id, death_time ),".
             // -1 if not set yet
             // 0 for Eve
+            // -2 if we tried to set it an hour after death and failed
+            // (so we shouldn't try again)
             // the Eve of this family line
             "eve_life_id INT NOT NULL,".
             "INDEX( eve_life_id ),".
+            // for quickly deleting old lives that aren't in record-breaking
+            // eve lines
+            "INDEX( eve_life_id, death_time ),".
             // both -1 if not set
             // 0 if set and empty
             "deepest_descendant_generation INT NOT NULL,".
@@ -677,6 +697,52 @@ function ls_showData( $checkPassword = true ) {
 
 
     echo "<hr>";
+
+    // form for updating depth for life
+?>
+        <hr>
+            <FORM ACTION="server.php" METHOD="post">
+    <INPUT TYPE="hidden" NAME="action" VALUE="recompute_depth">
+             Life ID: <INPUT TYPE="text" MAXLENGTH=40 SIZE=20 NAME="life_id"
+             VALUE=""> 
+    <INPUT TYPE="Submit" VALUE="Recompute Depth">
+    </FORM>
+        <hr>
+<?php
+
+
+    // form for updating depth for lives in bulk
+?>
+        <hr>
+            <FORM ACTION="server.php" METHOD="post">
+    <INPUT TYPE="hidden" NAME="action" VALUE="recompute_depth_bulk">
+             Num Recent Lives To Update: <INPUT TYPE="text" MAXLENGTH=40 SIZE=20 NAME="count"
+             VALUE=""> 
+    <INPUT TYPE="Submit" VALUE="Recompute Depth">
+    </FORM>
+        <hr>
+
+<?php   
+
+    // form for mapping player ids on a server to rocket-ride info
+?>
+        <td>
+        Map Player IDs:<br>
+            <FORM ACTION="server.php" METHOD="post">
+    <INPUT TYPE="hidden" NAME="action" VALUE="map_ids">  
+
+          IDs (one per line):<br>
+             <TEXTAREA NAME="player_ids" COLS=40 ROWS=10></TEXTAREA><br>
+    Server Name:
+    <INPUT TYPE="text" MAXLENGTH=40 SIZE=20 NAME="server"><br>
+
+    <INPUT TYPE="Submit" VALUE="Generate">
+    </FORM>
+        </td>
+<?php
+
+
+    echo "<hr>";
     
     echo "<a href=\"server.php?action=show_log\">".
         "Show log</a>";
@@ -695,18 +761,23 @@ function ls_showDetail( $checkPassword = true ) {
     echo "[<a href=\"server.php?action=show_data" .
          "\">Main</a>]<br><br><br>";
     
-    global $tableNamePrefix;
+    global $tableNamePrefix, $sharedGameServerSecret;
     
 
     $email = ls_requestFilter( "email", "/[A-Z0-9._%+\-]+@[A-Z0-9.\-]+/i" );
             
-    $query = "SELECT id, life_count FROM $tableNamePrefix"."users ".
-            "WHERE email = '$email';";
+    $query =
+        "SELECT id, life_count, sequence_number ".
+        "FROM $tableNamePrefix"."users ".
+        "WHERE email = '$email';";
     $result = ls_queryDatabase( $query );
 
     $id = ls_mysqli_result( $result, 0, "id" );
     $life_count = ls_mysqli_result( $result, 0, "life_count" );
+    $sequence_number = ls_mysqli_result( $result, 0, "sequence_number" );
 
+    $nextHashValue =
+        strtoupper( ls_hmac_sha1( $sharedGameServerSecret, $sequence_number ) );
     
 
     echo "<center><table border=0><tr><td>";
@@ -714,6 +785,8 @@ function ls_showDetail( $checkPassword = true ) {
     echo "<b>ID:</b> $id<br><br>";
     echo "<b>Email:</b> $email<br><br>";
     echo "<b>Life Count:</b> $life_count<br><br>";
+    echo "<b>Next sequence number:</b> $sequence_number<br><br>";
+    echo "<b>Next hash value:</b> $nextHashValue<br><br>";
     echo "<br><br>";
 
 
@@ -768,6 +841,58 @@ function ls_showDetail( $checkPassword = true ) {
 
 
 
+function ls_recomputeDepth() {
+    ls_checkPassword( "recompute_depth" );
+    
+    echo "[<a href=\"server.php?action=show_data" .
+         "\">Main</a>]<br><br><br>";
+    
+    global $tableNamePrefix;
+    
+
+    $life_id = ls_requestFilter( "life_id", "/[0-9]+/i", 0 );
+
+    echo "Setting up depth for life: $life_id<br><br>";
+        
+    ls_setupDepthForLife( $life_id );
+
+    echo "Done<br><br>";
+    }
+
+
+
+function ls_recomputeDepthBulk() {
+    ls_checkPassword( "recompute_depth_bulk" );
+    
+    echo "[<a href=\"server.php?action=show_data" .
+         "\">Main</a>]<br><br><br>";
+    
+    global $tableNamePrefix;
+    
+
+    $count = ls_requestFilter( "count", "/[0-9]+/i", 0 );
+
+    $query = "SELECT id FROM $tableNamePrefix"."lives ".
+        "WHERE generation = -1 ".
+        "ORDER BY id DESC LIMIT $count";
+
+    $result = ls_queryDatabase( $query );
+
+    $numRows = mysqli_num_rows( $result );
+
+    // process backwards, to increase chances of parents being done
+    // before children
+    for( $i=$numRows-1; $i>=0; $i-- ) {
+        
+        $id = ls_mysqli_result( $result, $i, "id" );
+        echo "Setting up depth for life: $id<br><br>";
+        ls_setupDepthForLife( $id );
+        }
+
+    echo "Done<br><br>";
+    }
+
+
 
 
 
@@ -814,7 +939,8 @@ function ls_getSequenceNumberForEmail( $inEmail ) {
 
 
 // can be called if server doesn't exist yet, and a record is created
-function ls_getServerID( $inServer ) {
+// returns -1 if not found and $inCreate is false
+function ls_getServerID( $inServer, $inCreate=false ) {
     global $tableNamePrefix;
     
     $query = "SELECT id FROM $tableNamePrefix"."servers ".
@@ -824,6 +950,10 @@ function ls_getServerID( $inServer ) {
     $numRows = mysqli_num_rows( $result );
 
     if( $numRows < 1 ) {
+        if( ! $inCreate ) {
+            return -1;
+            }
+        
         $query = "INSERT INTO $tableNamePrefix". "servers SET " .
             "server = '$inServer' ".
             "ON DUPLICATE KEY UPDATE server = '$inServer' ;";
@@ -923,14 +1053,18 @@ function ls_getGeneration( $inLifeID ) {
 function ls_getEveID( $inLifeID ) {
     global $tableNamePrefix;
     
-    $query = "SELECT server_id, eve_life_id, parent_id ".
+    $query = "SELECT server_id, eve_life_id, parent_id, death_time ".
         "FROM $tableNamePrefix"."lives ".
         "WHERE id = '$inLifeID';";
 
     $result = ls_queryDatabase( $query );
 
     $eve_life_id = ls_mysqli_result( $result, 0, "eve_life_id" );
-    
+
+    $deathAgoSec =
+        strtotime( "now" ) -
+        strtotime( ls_mysqli_result( $result, 0, "death_time" ) );
+
     if( $eve_life_id == -1 ) {
 
         // compute it, if we can
@@ -974,6 +1108,16 @@ function ls_getEveID( $inLifeID ) {
 
             $query = "UPDATE $tableNamePrefix"."lives SET ".
                 "eve_life_id = '$eve_life_id' WHERE id = '$inLifeID';";
+            ls_queryDatabase( $query );
+            }
+        else if( $deathAgoSec > 3600 ) {
+            // didn't find it
+            // AND this person has been dead for more than an hour
+            // stop trying to find their eve.  The chain is broken
+            // and we will never find it
+            // mark with -2
+            $query = "UPDATE $tableNamePrefix"."lives SET ".
+                "eve_life_id = '-2' WHERE id = '$inLifeID';";
             ls_queryDatabase( $query );
             }
         }
@@ -1280,11 +1424,14 @@ function ls_logLife() {
 
     $hash_value = strtoupper( $hash_value );
 
+    
+    ls_log( "Got logLife call:  " . $_SERVER[ 'QUERY_STRING' ] );
 
     if( $email == "" ||
         $server == "" ) {
 
-        ls_log( "logLife denied for bad email or server name" );
+        ls_log( "logLife denied for bad email or server name:  "
+                . $_SERVER[ 'QUERY_STRING' ] );
         
         echo "DENIED";
         return;
@@ -1293,7 +1440,8 @@ function ls_logLife() {
     $trueSeq = ls_getSequenceNumberForEmail( $email );
 
     if( $trueSeq > $sequence_number ) {
-        ls_log( "logLife denied for stale sequence number" );
+        ls_log( "logLife denied for stale sequence number:  "
+                . $_SERVER[ 'QUERY_STRING' ] );
 
         echo "DENIED";
         return;
@@ -1303,7 +1451,8 @@ function ls_logLife() {
         strtoupper( ls_hmac_sha1( $sharedGameServerSecret, $sequence_number ) );
 
     if( $computedHashValue != $hash_value ) {
-        // ls_log( "logLife denied for bad hash value" );
+        ls_log( "logLife denied for bad hash value:  "
+                . $_SERVER[ 'QUERY_STRING' ] );
 
         echo "DENIED";
         return;
@@ -1375,6 +1524,21 @@ function ls_logLife() {
     ls_queryDatabase( $query );
 
     $life_id = ls_getLifeID( $server_id, $player_id );
+
+    ls_setupDepthForLife( $life_id );
+    
+    
+    echo "OK";
+    }
+
+
+
+function ls_setupDepthForLife( $inLifeID ) {
+    $life_id = $inLifeID;
+
+    // this will compute it if it's not set yet
+    ls_getGeneration( $life_id );
+    
     $deepestInfo = ls_computeDeepestGeneration( $life_id );
 
 
@@ -1401,9 +1565,6 @@ function ls_logLife() {
                                        $deepest_descendant_life_id );
             }
         }
-    
-    
-    echo "OK";
     }
 
 
@@ -1626,9 +1787,10 @@ function ls_frontPage() {
         $result = ls_queryDatabase( $query );
         $numNameMatches = ls_mysqli_result( $result, 0, 0 );
 
-        if( $numNameMatches > 30000 ) {
+        if( $numNameMatches > 1000 ) {
             $filterClause = " WHERE 1 ";
             $tooManyNameMatches = true;
+            $customFilterSet = false;
             }
         else {
             // not too many
@@ -1646,6 +1808,24 @@ function ls_frontPage() {
 
     eval( $header );
 
+    $emailHashParam = "";
+
+    $email_sha1 = ls_requestFilter( "email_sha1", "/[a-f0-9]+/i", "" );
+    
+    if( $email_sha1 != "" ) {
+        $ticket_hash =
+            ls_requestFilter( "ticket_hash", "/[a-f0-9]+/i", "" );
+
+        $string_to_hash =
+            ls_requestFilter( "string_to_hash", "/[A-Z0-9]+/i", "0" );
+
+        $emailHashParam = "&email_sha1=$email_sha1".
+            "&ticket_hash=$ticket_hash&string_to_hash=$string_to_hash";
+        }
+    
+    echo "[<a href=http://oldlineage.onehouronelife.com/server.php".
+        "?action=front_page$emailHashParam>Historic Archive</a>]";
+    
     echo "<center>";
 
     $filterToShow = $nameFilter;
@@ -1969,7 +2149,10 @@ function ls_printFrontPageRows( $inForceIndexClause,
         "(query took $runTimeMS milisecond$plural)</td></tr>";
 
     if( $runTime > 0.5 ) {
-        ls_log( "This query took $runTimeMS miliseconds:  $query" );
+        // for now, we're logging ALL slow queries in ls_queryDatabase
+        // don't double-log here
+        
+        // ls_log( "This query took $runTimeMS miliseconds:  $query" );
         }
     }
 
@@ -2977,6 +3160,241 @@ function ls_characterDump() {
     }
 
 
+
+function ls_purgePrepare() {
+    global $tableNamePrefix;
+
+    
+    global $usersPerPage;
+
+    $numPerList = floor( $usersPerPage / 4 );
+
+    // keep twice as many record-breaking Eves as what are shown on front
+    // page
+    // each record-breaking family isn't THAT big, in the grand scheme of things
+    $numPerList *= 2;
+
+    $query = "SELECT id, name, death_time ".
+        "FROM $tableNamePrefix"."lives ".
+        "WHERE generation = 1 ".
+        "ORDER BY lineage_depth DESC, death_time DESC ".
+        "LIMIT $numPerList;";
+
+    $startTime = microtime( true );
+    
+    
+    $result = ls_queryDatabase( $query );
+    
+    $numRows = mysqli_num_rows( $result );
+
+    echo "$numRows eves<br>";
+    
+    for( $i=0; $i<$numRows; $i++ ) {
+        $id = ls_mysqli_result( $result, $i, "id" );
+        $name = ls_mysqli_result( $result, $i, "name" );
+        $death_time = ls_mysqli_result( $result, $i, "death_time" );
+
+        if( $name != "Nameless" ) {
+            
+            echo "Looking for missing descendants from $name<br>";
+
+            $lastName = explode(" ", $name )[1];
+
+            // find lives that share Eve's name but have no eve_life_id set
+        
+            // assumes no family lives more than 6 months from Eve to last
+            // descendant
+            // current record is something like 30 days
+            
+            $whereClause = " name LIKE '% $lastName' AND eve_life_id = -1 ".
+                "AND death_time > '$death_time' ".
+                "AND death_time < DATE_ADD( '$death_time', INTERVAL 6 MONTH ) ";
+
+
+            $queryB = "SELECT COUNT(*) ".
+                "FROM $tableNamePrefix"."lives ".
+                "WHERE $whereClause;";
+
+            $resultB = ls_queryDatabase( $queryB );
+
+            
+            $countB = ls_mysqli_result( $resultB, 0, 0 );
+
+            echo "-- Considering $countB<br>";
+
+            if( $countB > 0 ) {                
+            
+                $queryB = "SELECT id ".
+                    "FROM $tableNamePrefix"."lives ".
+                    "WHERE $whereClause;";
+
+                $resultB = ls_queryDatabase( $queryB );
+
+                
+                $numRowsB = mysqli_num_rows( $resultB );
+            
+                for( $j=0; $j<$numRowsB; $j++ ) {
+                    $idB = ls_mysqli_result( $resultB, $j, "id" );
+                
+                    // this will set it, if it can be computed
+                    ls_getEveID( $idB );
+                    }
+
+                $queryC = "SELECT COUNT(*) ".
+                    "FROM $tableNamePrefix"."lives ".
+                    "WHERE $whereClause;";
+
+                $resultC = ls_queryDatabase( $queryC );
+    
+                $countC = ls_mysqli_result( $resultC, 0, 0 );
+
+                $fixed = $countB - $countC;
+            
+            
+                echo "-- Set eve_life_id for $fixed of them<br>";
+                }
+            }
+        }
+
+    $deltaTime = microtime( true ) - $startTime;
+    
+    echo "Took $deltaTime seconds<br>";
+    }
+
+
+
+
+function ls_purge() {
+    global $tableNamePrefix;
+
+    global $usersPerPage;
+
+    $numPerList = floor( $usersPerPage / 4 );
+
+    // keep twice as many record-breaking Eves as what are shown on front
+    // page
+    // each record-breaking family isn't THAT big, in the grand scheme of things
+    $numPerList *= 2;
+
+    $query = "SELECT id, name, lineage_depth, death_time ".
+        "FROM $tableNamePrefix"."lives ".
+        "WHERE generation = 1 ".
+        "ORDER BY lineage_depth DESC, death_time DESC ".
+        "LIMIT $numPerList;";
+    
+    
+    $result = ls_queryDatabase( $query );
+    
+    $numRows = mysqli_num_rows( $result );
+
+    echo "Record-breaking eves:<br>";
+
+    $whereClauseA = " 1 ";
+    $whereClauseB = " 0 ";
+    
+    for( $i=0; $i<$numRows; $i++ ) {
+        $id = ls_mysqli_result( $result, $i, "id" );
+        $name = ls_mysqli_result( $result, $i, "name" );
+        $lineage_depth = ls_mysqli_result( $result, $i, "lineage_depth" );
+        $death_time = ls_mysqli_result( $result, $i, "death_time" );
+        
+        $deathAgoSec = strtotime( "now" ) -
+            strtotime( $death_time );
+        
+        $deathAgo = ls_secondsToAgeSummary( $deathAgoSec );
+
+        echo "$name || $lineage_depth || $deathAgo<br>\n";
+
+        $whereClauseA = $whereClauseA .
+            " AND eve_life_id != $id  AND id != $id ";
+        $whereClauseB = $whereClauseB .
+            " OR eve_life_id = $id OR id = $id ";
+        }
+    
+
+    $query =  "DELETE FROM $tableNamePrefix"."lives ".
+        "WHERE $whereClauseA ".
+        "AND death_time < DATE_SUB( NOW(), INTERVAL 1 YEAR ) LIMIT 10000;";
+
+    $result = ls_queryDatabase( $query );
+
+    if( $result == true ) {
+
+        global $ls_mysqlLink;
+        
+        $numDeleted = mysqli_affected_rows( $ls_mysqlLink );
+
+        echo "Deleted $numDeleted lives.<br>";
+        }
+    
+    }
+
+
+function ls_mapIDs() {
+    global $tableNamePrefix;
+    
+    $server = ls_requestFilter( "server", "/[A-Z0-9.\-]+/i", "" );
+
+    if( $server == "" ) {
+        echo "Must provide server name.";
+        return;
+        }
+    $serverID = ls_getServerID( $server, false );
+
+    if( $serverID == -1 ) {
+        echo "Unknown server:  $server";
+        return;
+        }
+    
+    $player_ids = "";
+    if( isset( $_REQUEST[ "player_ids" ] ) ) {
+        $player_ids = $_REQUEST[ "player_ids" ];
+        }
+
+    $idList = preg_split( "/\s+/", $player_ids );
+
+    foreach( $idList as $id ) {
+        $id = ls_filter( $id, "/[0-9]+/i", "" );
+
+        if( $id != "" ) {
+            $query = "SELECT name, age, display_id, last_words ".
+                "FROM $tableNamePrefix"."lives ".
+                "WHERE server_id = $serverID AND player_id = $id;";
+            $result = ls_queryDatabase( $query );
+
+            $numRows = mysqli_num_rows( $result );
+            if( $numRows < 1 ) {
+                echo "No life found for player_id: $id";
+                return;
+                }
+            $name = ls_mysqli_result( $result, 0, "name" );
+            $display_id = ls_mysqli_result( $result, 0, "display_id" );
+            $last_words = ls_mysqli_result( $result, 0, "last_words" );
+            $age = ls_mysqli_result( $result, 0, "age" );
+
+            $name = strtoupper( $name );
+            $last_words = strtoupper( $last_words );
+
+            $name = preg_replace( '/ /', '_', $name );
+            $last_words = preg_replace( '/ /', '_', $last_words );
+
+            if( $name == "NAMELESS" ) {
+                $name = "-";
+                }
+            if( $last_words == "" ) {
+                $last_words = "-";
+                }
+            $age = number_format( $age, 2 );
+            
+            echo "$display_id|$age|$name|0|0|0|0|0|0|$last_words<br>";
+            }
+        }
+    
+    }
+
+
+
+
 function ls_reformatNames() {
     global $tableNamePrefix;
 
@@ -3145,8 +3563,11 @@ function ls_secondsToAgeSummary( $inSeconds ) {
  *
  * @return a result handle that can be passed to other mysql functions.
  */
-function ls_queryDatabase( $inQueryString ) {
+function ls_queryDatabase( $inQueryString, $inLogLongQueries = true ) {
     global $ls_mysqlLink;
+
+    $startTime = microtime( true );
+    
     
     if( gettype( $ls_mysqlLink ) != "resource" ) {
         // not a valid mysql link?
@@ -3185,6 +3606,16 @@ function ls_queryDatabase( $inQueryString ) {
             }
         }
 
+    if( $inLogLongQueries ) {    
+        $runTime = microtime( true ) - $startTime;
+
+        if( $runTime > 0.5 ) {
+            $runTimeMS = number_format( $runTime * 1000, 0 );
+            ls_log( "This query took $runTimeMS miliseconds:  $inQueryString" );
+            }
+        }
+    
+    
     return $result;
     }
 
@@ -3239,7 +3670,25 @@ function ls_log( $message ) {
     
         $query = "INSERT INTO $tableNamePrefix"."log VALUES ( " .
             "'$slashedMessage', CURRENT_TIMESTAMP );";
+
+        // don't time this 
+        $result = ls_queryDatabase( $query, false );
+
+        
+        // don't keep log entries  after log gets too big
+
+        $query = "SELECT COUNT(*) FROM $tableNamePrefix"."log;";
+
         $result = ls_queryDatabase( $query );
+        
+        $countEntries = ls_mysqli_result( $result, 0, 0 );
+
+        if( $countEntries > 10000 ) {
+        
+            $query = "DELETE FROM $tableNamePrefix"."log ".
+                "ORDER BY entry_time ASC LIMIT 100";
+            ls_queryDatabase( $query );
+            }
         }
     }
 

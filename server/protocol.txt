@@ -190,6 +190,8 @@ GRAVE_MOVE (GM)
 
 GRAVE_OLD (GO)
 
+STATUE_INFO (ST)
+
 OWNER_LIST (OW)
 
 FOLLOWING (FW)
@@ -853,6 +855,37 @@ Same semantics for eve= tag at end as for LN message.
 
 
 
+
+
+
+ST
+x y po_id age statue_age underscored_name clothing_set underscored_final_words_text
+#
+
+
+Provides info about a statue.
+In response to a STATUE message from client.
+
+po_id is player's display object ID
+age is their age depicted in the statue
+
+statue_age is how long ago the satue was built (in in-game years)
+
+underscored_name is name with spaces replaced by _
+If player has no name, this will be ~ character instead.
+
+clothing_set is in format described for PU message above, but it will NOT
+have anything contained in it
+
+underscored_final_words_text has spaces replaced by _ and - if they said
+nothing.
+
+
+
+
+
+
+
 OW
 x y p_id p_id p_id ... p_id
 #
@@ -1139,6 +1172,7 @@ JUMP x y#
 EMOT x y e#
 DIE x y#
 GRAVE x y#
+STATUE x y#
 OWNER x y#
 FORCE x y#
 PING x y unique_id#
@@ -1211,7 +1245,7 @@ BABY is special case of USE action taken on a baby to pick them up.
 UBABY is a special case of SELF applied to a baby (to feed baby food
 	  or add/remove clothing from baby).  Also works on elderly.
       Note that server currently allows UBABY to feed anyone food, but
-      only putting clothing on babies and elderly.
+      only putting clothing on babies.
       ALSO:  UBABY is used for healing wounded players.
       Essentially, any action where held item is used on another player.
       Should be called UOTHER, but UBABY is used for historical reasons.
@@ -1297,6 +1331,11 @@ APVT for Another Planet servers and clients only, specifies this user's vote
      login, each and every time client logs in.  Thus, we can tell when
      a client's vote gets stale if they haven't joined the server in a while.
      x and y are ignored, and can be 0.
+
+GRAVE
+STATUE
+       Used by client to request grave and statue info for a given x,y location.
+
 
 
 

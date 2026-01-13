@@ -984,7 +984,7 @@ typedef struct LiveObject {
         const char *errorCauseString;
 
         char rodeRocket;
-        
+        GridPos rodeRocketLocation;
 
         int customGraveID;
         
@@ -1158,7 +1158,9 @@ typedef struct LiveObject {
         char postVogMode;
         
         char forceSpawn;
-        
+
+        char forcedName;
+        char forcedNameSent;
 
         // list of positions owned by this player
         SimpleVector<GridPos> ownedPositions;
@@ -1283,6 +1285,7 @@ static LiveObject *findFittestOffspring( int inPlayerID, int inSkipID,
         LiveObject *otherPlayer = players.getElement( j );
         
         if( ! otherPlayer->error &&
+            ! otherPlayer->isGhost && 
             otherPlayer->id != inPlayerID &&
             otherPlayer->id != inSkipID ) {
             
@@ -1689,7 +1692,7 @@ void removeAllOwnership( LiveObject *inPlayer, char inProcessInherit = true ) {
     inPlayer->ownedPositions.deleteAll();
 
     AppLog::infoF( "Removing all ownership (%d owned) for "
-                   "player %d (%s) took %lf sec",
+                   "player %d (%s) took %f sec",
                    num, inPlayer->id, inPlayer->email, 
                    Time::getCurrentTime() - startTime );
     }
@@ -2087,7 +2090,7 @@ int getPlayerDisplayID( int inID ) {
 char isPlayerIgnoredForEvePlacement( int inID ) {
     LiveObject *o = getLiveObject( inID );
     if( o != NULL ) {
-        return ( o->curseStatus.curseLevel > 0 ) || o->isTutorial;
+        return ( o->curseStatus.curseLevel > 0 ) || o->isTutorial || o->isGhost;
         }
 
     // player id doesn't even exist
@@ -3079,6 +3082,7 @@ typedef enum messageType {
     JUMP,
     DIE,
     GRAVE,
+    STATUE,
     OWNER,
     FORCE,
     MAP,
@@ -3326,6 +3330,9 @@ ClientMessage parseMessage( LiveObject *inPlayer, char *inMessage ) {
         }
     else if( strcmp( nameBuffer, "GRAVE" ) == 0 ) {
         m.type = GRAVE;
+        }
+    else if( strcmp( nameBuffer, "STATUE" ) == 0 ) {
+        m.type = STATUE;
         }
     else if( strcmp( nameBuffer, "OWNER" ) == 0 ) {
         m.type = OWNER;
@@ -3815,6 +3822,7 @@ static void restockPostWindowFamilies() {
         
         if( ! o->error &&
             ! o->isTutorial &&
+            ! o->isGhost &&
             o->curseStatus.curseLevel == 0 &&
             familyLineageEveIDsAfterEveWindow.getElementIndex( 
                 o->lineageEveID ) == -1 ) {
@@ -3884,6 +3892,7 @@ static void logFamilyCounts() {
                 
                 if( ! o->error &&
                     ! o->isTutorial &&
+                    ! o->isGhost &&
                     o->curseStatus.curseLevel == 0 &&
                     o->lineageEveID == lineageEveID ) {
                     
@@ -4029,6 +4038,7 @@ int longestShutdownLine = -1;
 void handleShutdownDeath( LiveObject *inPlayer,
                           int inX, int inY ) {
     if( inPlayer->curseStatus.curseLevel == 0 &&
+        ! inPlayer->isGhost &&
         inPlayer->parentChainLength > longestShutdownLine ) {
         
         // never count a cursed player as a long line
@@ -4067,6 +4077,9 @@ static SimpleVector<int> newEmotTTLs;
 
 static SimpleVector<int> newGhostPlayers;
 
+static void leaderDied( LiveObject *inLeader );
+
+
 
 double computeAge( LiveObject *inPlayer ) {
     double age = computeAge( inPlayer->lifeStartTimeSeconds );
@@ -4094,6 +4107,9 @@ double computeAge( LiveObject *inPlayer ) {
 
             inPlayer->alreadyCheckedGhostChance = true;
             inPlayer->isGhost = true;
+            
+            // they don't keep leadership as ghost
+            leaderDied( inPlayer );
             
             newGhostPlayers.push_back( inPlayer->id );
             
@@ -6925,6 +6941,180 @@ static void forcePlayerToRead( LiveObject *inPlayer,
 
 
 
+
+static const char *numberToWords( int inNumber );
+
+
+static void replaceSpacesWithUnderscores( char *inString ) {
+    char *s = inString;
+    int i = 0;
+    while( s[i] != '\0' ) {
+        if( s[i] == ' ' ) {
+            s[i] = '_';
+            }
+        i++;
+        }
+    }
+
+
+static void replaceUnderscoresWithSpaces( char *inString ) {
+    char *s = inString;
+    int i = 0;
+    while( s[i] != '\0' ) {
+        if( s[i] == '_' ) {
+            s[i] = ' ';
+            }
+        i++;
+        }
+    }
+
+
+static void playerReadsStatue( LiveObject *inPlayer,
+                               int inX, int inY ) {
+    char buffer[ MAP_STATUE_DATA_LENGTH ];
+    timeSec_t statueTime;
+    
+    char found = getStatueData( inX, inY, &statueTime, buffer );
+    
+    if( ! found ) {
+        makePlayerSay( inPlayer, (char*)":FORGOTTEN STATUE" );
+        return;
+        }
+    // fixme
+    double deltaSeconds = 
+        Time::getCurrentTime() - statueTime;
+    
+    double age = deltaSeconds * getAgeRate();
+    
+    char *ageString = NULL;
+    
+    if( age < 1 ) {
+        ageString = stringDuplicate( "JUST NOW" );
+        }
+    else if( age < 2 ) {
+        ageString = stringDuplicate( "ONE YEAR AGO" );
+        }
+    else if( age < 20 ) {
+        ageString = autoSprintf( "%s YEARS AGO", 
+                                 numberToWords( (int)floor( age ) ) );
+        }
+    else if( age < 200 ) {
+        ageString = autoSprintf( "%s DECADES AGO", 
+                                 numberToWords( (int)floor( age / 10 ) ) );
+        }
+    else if( age < 2000 ) {
+        ageString = autoSprintf( "%s CENTURIES AGO", 
+                                 numberToWords( (int)floor( age / 100 ) ) );
+        }
+    else if( age < 20000 ) {
+        ageString = autoSprintf( "%s MILLENNIA AGO", 
+                                 numberToWords( (int)floor( age / 1000 ) ) );
+        }
+    else if( age < 200000 ) {
+        ageString = autoSprintf( "%s MYRIAD YEARS AGO", 
+                                 numberToWords( (int)floor( age / 10000 ) ) );
+        }
+    else if( age < 2000000 ) {
+        ageString = autoSprintf( "%s HUNDRED MILLENNIA AGO", 
+                                 numberToWords( (int)floor( age / 100000 ) ) );
+        }
+    else if( age < 20000000 ) {
+        ageString = autoSprintf( 
+            "%s THOUSAND MILLENNIA AGO", 
+            numberToWords( (int)floor( age / 1000000 ) ) );
+        }
+    else if( age < 200000000 ) {
+        ageString = autoSprintf( 
+            "%s THOUSAND MYRIAD YEARS AGO", 
+            numberToWords( (int)floor( age / 10000000 ) ) );
+        }
+    else if( age < 2000000000 ) {
+        ageString = autoSprintf( 
+            "%s HUNDRED THOUSAND MILLENNIA AGO", 
+            numberToWords( (int)floor( age / 100000000 ) ) );
+        }
+    else if( age < 20000000000 ) {
+        ageString = autoSprintf( 
+            "%s MILLION MILLENNIA AGO", 
+            numberToWords( (int)floor( age / 1000000000 ) ) );
+        }
+    else if( age < 200000000000 ) {
+        ageString = autoSprintf( 
+            "%s MILLION MYRIAD YEARS AGO", 
+            numberToWords( (int)floor( age / 10000000000 ) ) );
+        }  
+    else if( age < 2000000000000 ) {
+        ageString = autoSprintf( 
+            "%s HUNDRED MILLION MILLENNIA AGO", 
+            numberToWords( (int)floor( age / 100000000000 ) ) );
+        }
+    else if( age < 20000000000000 ) {
+        ageString = autoSprintf( 
+            "%s BILLION MILLENNIA AGO", 
+            numberToWords( (int)floor( age / 1000000000000 ) ) );
+        }
+    else if( age < 200000000000000 ) {
+        ageString = autoSprintf( 
+            "%s BILLION MYRIAD YEARS AGO", 
+            numberToWords( (int)floor( age / 10000000000000 ) ) );
+        }
+    else {
+        // will become "MANY HUNDRED BILLION MILLENNIA" if
+        // we go over 20 here
+        // but we still support correct number scaling all the way up
+        // to 3 billion years of real-world time
+        // (each year in real world is roughly 500K in-game years)
+        ageString = autoSprintf( 
+            "%s HUNDRED BILLION MILLENNIA AGO", 
+            numberToWords( (int)floor( age / 100000000000000 ) ) );
+        }
+
+    int numParts;
+    char **parts = split( buffer, "|", &numParts );
+    
+    char *playerSays = NULL;
+    
+    if( numParts == 10 ) {
+        char *name = parts[2];
+        char *lastWords = parts[9];
+        
+        replaceUnderscoresWithSpaces( name );
+        replaceUnderscoresWithSpaces( lastWords );
+        
+        const char *workingName = name;
+        
+        if( strcmp( workingName, "-" ) == 0 ) {
+            workingName = "A NAMLESS PERSON";
+            }
+        if( strcmp( lastWords, "-" ) == 0 ) {
+            playerSays = autoSprintf( 
+                ":%s LEFT THE PLANET %s AND SAID NOTHING. "
+                "JUST GAVE US A GLANCE... "
+                "JUST GAVE US A VERY SAD, SAD BACKWARD GLANCE...",
+                workingName, ageString, lastWords );
+            }
+        else {
+            playerSays = autoSprintf( ":%s LEFT THE PLANET %s AND SAID: %s",
+                                      workingName, ageString, lastWords );
+            }
+        }
+    else {
+        playerSays = 
+            autoSprintf( ":AN UNKNOWN PERSON FLEW AWAY %s", ageString );
+        }
+    for( int i=0; i<numParts; i++ ) {
+        delete [] parts[i];
+        }
+    delete [] parts;
+    
+    delete [] ageString;
+    
+    makePlayerSay( inPlayer, playerSays );
+    
+    delete [] playerSays;
+    }
+
+
 char canPlayerUseTool( LiveObject *inPlayer, int inToolID );
 
 
@@ -7487,8 +7677,11 @@ void handleForcedBabyDrop(
     }
 
 
-
-static void handleHoldingChange( LiveObject *inPlayer, int inNewHeldID );
+// inForceTransition means a transition really happened here
+// and we should update the holdingEtaDecay, even if the held object
+// hasn't changed
+static void handleHoldingChange( LiveObject *inPlayer, int inNewHeldID,
+                                 char inForceTransition = false );
 
 
 
@@ -8286,7 +8479,10 @@ static int isPlayerCountable( LiveObject *p, int inLineageEveID,
     if( p->vogMode ) {
         return false;
         }
-    
+    if( p->isGhost ) {
+        return false;
+        }
+
     if( inLineageEveID != -1 &&
         p->lineageEveID != inLineageEveID ) {
         return false;
@@ -8420,7 +8616,7 @@ static int countHelplessBabies() {
 
 
 // counts only those inside barrier, if barrier on
-// always ignores tutorial and donkytown players
+// always ignores tutorial and donkytown players and ghosts
 static int countLivingPlayers() {
     
     int barrierRadius = 
@@ -8794,6 +8990,9 @@ static void setupToolSlots( LiveObject *inPlayer ) {
 
 
 typedef struct ForceSpawnRecord {
+        // true means get born as baby
+        // false means spawn at pos/age given
+        char getBorn;
         GridPos pos;
         double age;
         char *firstName;
@@ -8829,12 +9028,20 @@ char getForceSpawn( char *inEmail, ForceSpawnRecord *outRecordToFill ) {
 
             char emailBuff[100];
             
+            // 1 to force spawn at location
+            // 2 to force display id and clothes but let them
+            //   get born as a baby
             int on = 0;
             
             sscanf( lines[i],
                     "%99s %d", emailBuff, &on );
 
-            if( on == 1 ) {
+            if( on > 0 ) {
+                outRecordToFill->getBorn = false;
+                
+                if( on == 2 ) {
+                    outRecordToFill->getBorn = true;
+                    }
                 
                 outRecordToFill->firstName = new char[20];
                 outRecordToFill->lastName = new char[20];
@@ -10111,6 +10318,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
     
     
     char forceSpawn = false;
+    char forceDisplayID = false;
     ForceSpawnRecord forceSpawnInfo;
     
     if( SettingsManager::getIntSetting( "forceAllPlayersEve", 0 ) ) {
@@ -10120,7 +10328,17 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
         forceSpawn = getForceSpawn( inEmail, &forceSpawnInfo );
     
         if( forceSpawn ) {
-            parentChoices.deleteAll();
+            
+            if( ! forceSpawnInfo.getBorn ) {
+                parentChoices.deleteAll();
+                }
+            else {
+                // keep parent choices
+                // just use forceSpawnInfo to set display ID and clothes
+                // for baby
+                forceSpawn = false;
+                forceDisplayID = true;
+                }
             }
         }
 
@@ -10712,6 +10930,7 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
             if( player->error || 
                 ! player->connected ||
                 player->isTutorial ||
+                player->isGhost ||
                 player->vogMode ) {
                 continue;
                 }
@@ -10908,6 +11127,19 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
             newObject.clothing = getTriggerPlayerClothing( inEmail );
             }
         }
+    else if( newObject.isEve ) {
+        useContentSettings();
+
+        int eveStartsHoldingID = 
+            SettingsManager::getIntSetting( "eveStartsHolding", 0 );
+        
+        useMainSettings();
+        
+        if( eveStartsHoldingID != 0 ) {
+            newObject.holdingID = eveStartsHoldingID;
+            }
+        }
+    
     
     
     newObject.lineage = new SimpleVector<int>();
@@ -11164,23 +11396,30 @@ int processLoggedInPlayer( int inAllowOrForceReconnect,
         currentTime + 
         computeFoodDecrementTimeSeconds( &newObject );
 
+    
+    newObject.forcedName = false;
+    
+    if( forceSpawn || forceDisplayID ) {
+        if( forceSpawn ) {
+            newObject.forceSpawn = true;
+            newObject.xs = forceSpawnInfo.pos.x;
+            newObject.ys = forceSpawnInfo.pos.y;
+            newObject.xd = forceSpawnInfo.pos.x;
+            newObject.yd = forceSpawnInfo.pos.y;
         
-    if( forceSpawn ) {
-        newObject.forceSpawn = true;
-        newObject.xs = forceSpawnInfo.pos.x;
-        newObject.ys = forceSpawnInfo.pos.y;
-        newObject.xd = forceSpawnInfo.pos.x;
-        newObject.yd = forceSpawnInfo.pos.y;
+            newObject.birthPos = forceSpawnInfo.pos;
         
-        newObject.birthPos = forceSpawnInfo.pos;
-        
-        newObject.lifeStartTimeSeconds = 
-            Time::getCurrentTime() -
-            forceSpawnInfo.age * ( 1.0 / getAgeRate() );
+            newObject.lifeStartTimeSeconds = 
+                Time::getCurrentTime() -
+                forceSpawnInfo.age * ( 1.0 / getAgeRate() );
+            }
         
         newObject.name = autoSprintf( "%s %s", 
                                       forceSpawnInfo.firstName,
                                       forceSpawnInfo.lastName );
+        newObject.forcedName = true;
+        newObject.forcedNameSent = false;
+        
         newObject.displayID = forceSpawnInfo.displayID;
         
         newObject.clothing.hat = getObject( forceSpawnInfo.hatID, true );
@@ -12539,6 +12778,17 @@ static char addHeldToClothingContainer( LiveObject *inPlayer,
             containSize <= slotSize &&
             permitted ) {
             // room (or will swap, so we can over-pack it)
+
+            
+            // drop on ground transition?  If so, apply here
+            // as object leaves our hands
+            TransRecord *r = getPTrans( inPlayer->holdingID, -1 );
+
+            if( r != NULL && r->newActor == 0 && r->newTarget > 0 ) {
+                inPlayer->holdingID = r->newTarget;
+                setFreshEtaDecayForHeld( inPlayer );
+                }
+
             inPlayer->clothingContained[inC].
                 push_back( 
                     inPlayer->holdingID );
@@ -12763,23 +13013,39 @@ static char removeFromClothingContainerToHold( LiveObject *inPlayer,
         inPlayer->holdingID = 
             inPlayer->clothingContained[inC].
             getElementDirect( slotToRemove );
-        holdingSomethingNew( inPlayer );
 
-        inPlayer->holdingEtaDecay = 
-            inPlayer->
-            clothingContainedEtaDecays[inC].
-            getElementDirect( slotToRemove );
+        // does bare-hand action apply to this newly-held object
+        // one that results in something new in the hand and
+        // nothing on the ground?
+        
+        // if so, it is a pick-up action, and it should apply here
+        
+        TransRecord *pickupTrans = getPTrans( 0, inPlayer->holdingID );
+        
+        if( pickupTrans != NULL && pickupTrans->newActor > 0 &&
+            pickupTrans->newTarget == 0 ) {
+            
+            handleHoldingChange( inPlayer, pickupTrans->newActor );
+            }
+        else {
+            holdingSomethingNew( inPlayer );
+            
+            inPlayer->holdingEtaDecay = 
+                inPlayer->
+                clothingContainedEtaDecays[inC].
+                getElementDirect( slotToRemove );
                                     
-        timeSec_t curTime = Time::timeSec();
+            timeSec_t curTime = Time::timeSec();
 
-        if( inPlayer->holdingEtaDecay != 0 ) {
+            if( inPlayer->holdingEtaDecay != 0 ) {
                                         
-            timeSec_t offset = 
-                inPlayer->holdingEtaDecay
-                - curTime;
-            offset = offset * stretch;
-            inPlayer->holdingEtaDecay =
-                curTime + offset;
+                timeSec_t offset = 
+                    inPlayer->holdingEtaDecay
+                    - curTime;
+                offset = offset * stretch;
+                inPlayer->holdingEtaDecay =
+                    curTime + offset;
+                }
             }
 
         inPlayer->clothingContained[inC].
@@ -12941,7 +13207,8 @@ static TransRecord *getBareHandClothingTrans( LiveObject *nextPlayer,
 
 
 // change held as the result of a transition
-static void handleHoldingChange( LiveObject *inPlayer, int inNewHeldID ) {
+static void handleHoldingChange( LiveObject *inPlayer, int inNewHeldID,
+                                 char inForceTransition ) {
     
     LiveObject *nextPlayer = inPlayer;
 
@@ -13074,7 +13341,16 @@ static void handleHoldingChange( LiveObject *inPlayer, int inNewHeldID ) {
             setFreshEtaDecayForHeld( nextPlayer );
             }
         }
-
+    else if( inForceTransition ) {
+        // our object id didn't change
+        // but there WAS a transition that happened
+        // update our eta decay time
+        // (it might have been a self-to-self decay transition,
+        //  like for a moving object, in which case our eta decay time
+        //  is stale)
+        setFreshEtaDecayForHeld( nextPlayer );
+        }
+     
     }
 
 
@@ -13264,8 +13540,17 @@ char *isNamingSay( char *inSaidString, SimpleVector<char*> *inPhraseList ) {
             // hit
             int phraseLen = strlen( testString );
             // skip spaces after
+            int spaceCount = 0;
             while( saidString[ phraseLen ] == ' ' ) {
                 phraseLen++;
+                spaceCount++;
+                }
+            if( spaceCount == 0 ) {
+                // no space after the naming phrase?
+                // then it's not a valid naming phrase!
+                // Like if they say, I AM EVERHARD
+                // we don't want to match the "I AM EVE ____" phrase.
+                continue;
                 }
             return &( saidString[ phraseLen ] );
             }
@@ -15055,6 +15340,70 @@ static void interruptAnyKillEmots( int inPlayerID,
 
 
 
+static char getClueInfo( int *outPos, char *outLetter ) {
+    char *contMixed = 
+        SettingsManager::getSettingContents( "secretMessage" );
+    char *cont = stringToUpperCase( contMixed );
+            
+    delete [] contMixed;
+                    
+    int contLen = strlen( cont );
+                    
+    if( clueIndicesLeftToGive.size() == 0 ) {
+        // all have been given (or this is our first clue)
+        // refill with valid indices
+        for( int i=0; i<contLen; i++ ) {
+            if( cont[i] != ' ' 
+                &&
+                cont[i] != '\n' ) {
+                clueIndicesLeftToGive.push_back( i );
+                }
+            }
+        }
+                    
+    char found = false;
+    
+    if( clueIndicesLeftToGive.size() > 0 ) {
+        int i = 
+            randSource.getRandomBoundedInt( 
+                0, 
+                clueIndicesLeftToGive.size() - 1 );
+                        
+        int letterPick = 
+            clueIndicesLeftToGive.getElementDirect( i );
+        clueIndicesLeftToGive.deleteElement( i );
+
+        *outPos = letterPick + 1;
+        *outLetter = cont[ letterPick ];
+        found = true;
+        }
+    
+    delete [] cont;
+    
+    return found;
+    }
+
+
+
+static void sendGenericClueMessage( LiveObject *inPlayer) {
+    int letterPosition;
+    char letter;
+    char gotClue = getClueInfo( &letterPosition, &letter );
+
+    if( gotClue ) {
+
+        char *message = 
+            autoSprintf( 
+                "A LONG-LOST CLUE,**"
+                "MY WORD IS TRUE:  %d : %c",
+                letterPosition, letter );
+                        
+        sendGlobalMessage( message, inPlayer );
+        delete [] message;
+        }
+    }
+
+
 static void setPerpetratorHoldingAfterKill( LiveObject *nextPlayer,
                                             LiveObject *hitPlayer,
                                             TransRecord *woundHit,
@@ -15102,48 +15451,22 @@ static void setPerpetratorHoldingAfterKill( LiveObject *nextPlayer,
                     }
                 
                 if( newVictimEmot ) {
-                
-                    char *contMixed = 
-                        SettingsManager::getSettingContents( "secretMessage" );
-                    char *cont = stringToUpperCase( contMixed );
-            
-                    delete [] contMixed;
-                    
-                    int contLen = strlen( cont );
-                    
-                    if( clueIndicesLeftToGive.size() == 0 ) {
-                        // all have been given (or this is our first clue)
-                        // refill with valid indices
-                        for( int i=0; i<contLen; i++ ) {
-                            if( cont[i] != ' ' 
-                                &&
-                                cont[i] != '\n' ) {
-                                clueIndicesLeftToGive.push_back( i );
-                                }
-                            }
-                        }
-                    
-                    
-                    if( clueIndicesLeftToGive.size() > 0 ) {
-                        int i = 
-                            randSource.getRandomBoundedInt( 
-                                0, 
-                                clueIndicesLeftToGive.size() - 1 );
-                        
-                        int letterPick = 
-                            clueIndicesLeftToGive.getElementDirect( i );
-                        clueIndicesLeftToGive.deleteElement( i );
-                        
+                    // specialty message for headless horseman
+                    int letterPosition;
+                    char letter;
+                    char gotClue = getClueInfo( &letterPosition, &letter );
+
+                    if( gotClue ) {
+
                         char *message = 
                             autoSprintf( 
                                 "ANOTHER NECK HAS MET YOUR SWORD.**"
                                 "ANOTHER CLUE (I KEEP MY WORD):  %d : %c",
-                                letterPick + 1, cont[letterPick] );
+                                letterPosition, letter );
                         
                         sendGlobalMessage( message, nextPlayer );
                         delete [] message;
                         }
-                    delete [] cont;
                     }
                 else {
                     char *message = 
@@ -15460,7 +15783,58 @@ void executeKillAction( int inKillerIndex,
                                         
                     hitPlayer->murderPerpID =
                         nextPlayer->id;
-                                        
+
+                    // send DING message to nearby players
+                    const char *killerName = "UNNAMED PERSON";
+                    const char *victimName = "UNNAMED PERSON";
+                    if( nextPlayer->name != NULL ) {
+                        killerName = nextPlayer->name;
+                        }
+                    if( hitPlayer->name != NULL ) {
+                        victimName = hitPlayer->name;
+                        }
+
+                    ObjectRecord *weapon = getObject( nextPlayer->holdingID,
+                                                      true );
+                    char *weaponName;
+
+                    if( weapon != NULL ) {
+                        weaponName = stringDuplicate( weapon->description );
+                        stripDescriptionComment( weaponName );
+                        }
+                    else {
+                        weaponName = stringDuplicate( "UNKNOWN WEAPON" );
+                        }
+
+
+                    char *message = autoSprintf( "%s HAS JUST WOUNDED %s**"
+                                                 "WITH THE %s.", 
+                                                 killerName, victimName,
+                                                 weaponName );
+                    delete [] weaponName;
+                    
+                    // send only to nearby players, and 
+                    // NOT to victim or perp
+                    for( int pm=0; pm<players.size(); pm++ ) {
+                        LiveObject *messagePlayer = players.getElement( pm );
+            
+                        if( messagePlayer == nextPlayer ||
+                            messagePlayer == hitPlayer ||
+                            messagePlayer->error ) {
+                            continue;
+                            }
+
+                        if( distance( getPlayerPos( hitPlayer ), 
+                                      getPlayerPos( messagePlayer ) ) > 100 ) {
+                            // only consider nearby players
+                            continue;
+                            }
+                        sendGlobalMessage( message, messagePlayer );
+                        }
+                    
+                    delete [] message;
+                    
+                    
                     // brand this player as a murderer
                     nextPlayer->everKilledAnyone = true;
 
@@ -16289,12 +16663,8 @@ static char *getToolSetDescription( ObjectRecord *inToolO ) {
                     }
                 }
             // now replace any _ with ' '
-            tagLen = strlen( tagPos );
-            for( int i=0; i<tagLen; i++ ) {
-                if( tagPos[i] == '_' ) {
-                    tagPos[i] = ' ';
-                    }
-                }
+            replaceUnderscoresWithSpaces( tagPos );
+
             char *newDes = stringDuplicate( tagPos );
             delete [] des;
             des = newDes;
@@ -16721,8 +17091,33 @@ char isHungryWorkBlocked( LiveObject *inPlayer,
     }
 
 
+void applyHungryWorkCost( LiveObject *inPlayer, int inHungryWorkCost ) {
+    if( inHungryWorkCost > 0 ) {
+        if( inPlayer->yummyBonusStore > 0 ) {
+            if( inPlayer->yummyBonusStore
+                >= inHungryWorkCost ) {
+                inPlayer->yummyBonusStore -=
+                    inHungryWorkCost;
+                inHungryWorkCost = 0;
+                }
+            else {
+                inHungryWorkCost -= 
+                    inPlayer->yummyBonusStore;
+                inPlayer->yummyBonusStore = 0;
+                }
+            }
+                                        
+        inPlayer->foodStore -= inHungryWorkCost;
+                                        
+        // we checked above, so player
+        // never is taken down below 5 here
+        inPlayer->foodUpdate = true;
+        }
+    }
 
-const char *numberToWords( int inNumber ) {
+
+
+static const char *numberToWords( int inNumber ) {
     switch( inNumber ) {
         case 1:
             return "ONE";
@@ -16798,6 +17193,7 @@ void sendNearPopSpeech( LiveObject *inPlayer,
             
             if( ! otherPlayer->error &&
                 ! otherPlayer->isTutorial &&
+                ! otherPlayer->isGhost &&
                 otherPlayer->curseStatus.curseLevel == 0 ) {
                 
                 totalCount++;
@@ -16853,6 +17249,7 @@ char isNearPopBlocked( LiveObject *inPlayer,
         
         if( ! otherPlayer->error &&
             ! otherPlayer->isTutorial &&
+            ! otherPlayer->isGhost &&
             otherPlayer->curseStatus.curseLevel == 0 ) {
             
             totalCount++;
@@ -17003,8 +17400,10 @@ static void findExpertForPlayer( LiveObject *inPlayer,
         for( int i=0; i<players.size(); i++ ) {
             LiveObject *p = players.getElement( i );
             
-            if( p->isTutorial || p->curseStatus.curseLevel > 0 ) {
+            if( p->isTutorial || p->curseStatus.curseLevel > 0
+                || p->isGhost ) {
                 // skip tutorial or donkeytown players
+                // also skip ghosts
                 continue;
                 }
             
@@ -17366,7 +17765,8 @@ static void leaderDied( LiveObject *inLeader ) {
                 &&
                 distance( location, getPlayerPos( otherPlayer ) ) <= maxDistance
                 &&
-                ! isExiled( inLeader, otherPlayer ) ) {
+                ! isExiled( inLeader, otherPlayer ) &&
+                ! otherPlayer->isGhost ) {
                 
                 fittestFitness = otherPlayer->fitnessScore;
                 fittestFollower = otherPlayer;
@@ -17381,7 +17781,8 @@ static void leaderDied( LiveObject *inLeader ) {
                 LiveObject *otherPlayer = directFollowers.getElementDirect( i );
                 
                 if( otherPlayer->fitnessScore > fittestFitness &&
-                    ! isExiled( inLeader, otherPlayer ) ) {
+                    ! isExiled( inLeader, otherPlayer ) &&
+                    ! otherPlayer->isGhost ) {
                     
                     fittestFitness = otherPlayer->fitnessScore;
                     fittestFollower = otherPlayer;
@@ -17401,7 +17802,8 @@ static void leaderDied( LiveObject *inLeader ) {
                 if( otherPlayer->fitnessScore > fittestFitness 
                     &&
                     distance( location, getPlayerPos( otherPlayer ) ) 
-                    <= maxDistance ) {
+                    <= maxDistance &&
+                    ! otherPlayer->isGhost ) {
                 
                     fittestFitness = otherPlayer->fitnessScore;
                     fittestFollower = otherPlayer;
@@ -17416,7 +17818,8 @@ static void leaderDied( LiveObject *inLeader ) {
                         directFollowers.getElementDirect( i );
             
                     // ignore exile status this time
-                    if( otherPlayer->fitnessScore > fittestFitness ) {
+                    if( otherPlayer->fitnessScore > fittestFitness &&
+                        ! otherPlayer->isGhost ) {
                         
                         fittestFitness = otherPlayer->fitnessScore;
                         fittestFollower = otherPlayer;
@@ -18170,7 +18573,7 @@ static void handleHeldDecay(
         
         int newID = t->newTarget;
         
-        handleHoldingChange( nextPlayer, newID );
+        handleHoldingChange( nextPlayer, newID, true );
         
         if( newID == 0 &&
             nextPlayer->holdingWound &&
@@ -18294,8 +18697,10 @@ static char messageFloodCheck( LiveObject *inPlayer, messageType inType ) {
     // or GRAVE messages all at once
     // (And note that OWNER and GRAVE messages don't result in anything being
     //  sent to nearby players)
+    // Same with walking into an area with a lot of statues.
     if( inType == OWNER ||
-        inType == GRAVE ) {
+        inType == GRAVE ||
+        inType == STATUE ) {
         return false;
         }
     
@@ -18400,6 +18805,90 @@ void removeOwnership( int inX, int inY ) {
 
 
 
+// inString can be null, returned string will be "-"
+// returned string newly allocated, destroyed by caller
+static char *prepareRocketString( char *inString ) {
+    char *s;
+    if( inString == NULL ) {
+        s = stringDuplicate( "-" );
+        }
+    else {
+        s = stringDuplicate( inString );
+            
+        replaceSpacesWithUnderscores( s );
+        }
+    return s;
+    }
+
+
+void buildPostRocketStatue( LiveObject *inPlayer, GridPos inPos ) {
+    int x = inPos.x;
+    int y = inPos.y;
+    
+
+    useContentSettings();
+    
+    int statueObjectID =
+        SettingsManager::getIntSetting( "postRocketStatueObject", -1 );
+
+    useMainSettings();
+    
+
+    if( statueObjectID == -1 ) {
+        AppLog::errorF( "Player %d rode rocket at %d,%d but no "
+                        "postRocketStatueObject "
+                        "set in conentSettings, so we can't build statue.",
+                        inPlayer->id, x, y );
+        return;
+        }
+
+    setMapObject( x, y, statueObjectID );
+        
+    // stick data in statue database
+        
+    int clothingIDs[ NUM_CLOTHING_PIECES ];
+    for( int i=0; i< NUM_CLOTHING_PIECES; i++ ) {
+        ObjectRecord *co = clothingByIndex( inPlayer->clothing, i );
+        if( co == NULL ) {
+            clothingIDs[i] = 0;
+            }
+        else {
+            clothingIDs[i] = co->id;
+            }
+        }
+        
+    char *name = prepareRocketString( inPlayer->name );
+    char *finalWords = prepareRocketString( inPlayer->lastSay );
+    timeSec_t statueTime = Time::timeSec();
+    //        displayID|age|name|
+    //           hat|tunic|frontShoe|backShoe|bottom|backpack|
+    //           final_words
+    char *data = autoSprintf( "%d|%0.2f|%s|"
+                              "%d|%d|%d|%d|%d|%d|"
+                              "%s",
+                              inPlayer->displayID,
+                              computeAge( inPlayer ),
+                              name,
+                              clothingIDs[0],
+                              clothingIDs[1],
+                              clothingIDs[2],
+                              clothingIDs[3],
+                              clothingIDs[4],
+                              clothingIDs[5],
+                              finalWords );
+                                  
+    delete [] name;
+    delete [] finalWords;
+ 
+    addStatueData( x, y,
+                   statueTime,
+                   data );
+        
+    delete [] data;   
+    }
+
+
+
 void startAHAPGrant( int inX, int inY, LiveObject *inPlayer ) {
     int rocketEnabled =
         SettingsManager::getIntSetting( "rocketEnabled", 0 );
@@ -18428,6 +18917,8 @@ void startAHAPGrant( int inX, int inY, LiveObject *inPlayer ) {
         }
 
     inPlayer->rodeRocket = true;
+    inPlayer->rodeRocketLocation.x = inX;
+    inPlayer->rodeRocketLocation.y = inY;
     
     inPlayer->dying = true;
     inPlayer->dyingETA = Time::getCurrentTime() + rocketAnimationTime;
@@ -18500,6 +18991,9 @@ static GridPos getAveragePopulationPos(
 
 
 int main( int inNumArgs, const char **inArgs ) {
+    // use the serverSettings folder if it's available
+    setUseServerSettings();
+    
     useMainSettings();
     
     if( checkReadOnly() ) {
@@ -19179,7 +19673,7 @@ int main( int inNumArgs, const char **inArgs ) {
             monumentStep();
             
             char specialBiomeStatusChanged = 
-                updateSpecialBiomes( players.size() );
+                updateSpecialBiomes( countLivingPlayers() );
             
             if( specialBiomeStatusChanged ) {
                 for( int i=0; i< players.size(); i++ ) {
@@ -19330,6 +19824,7 @@ int main( int inNumArgs, const char **inArgs ) {
         
                     if( ! o->error &&
                         ! o->isTutorial &&
+                        ! o->isGhost &&
                         o->curseStatus.curseLevel == 0 ) {
                         
                         population.push_back( o );
@@ -19382,13 +19877,27 @@ int main( int inNumArgs, const char **inArgs ) {
                     GridPos placePos = { avePos.x + xRad,
                                          avePos.y + yRad };
                     
-
-                    setMapObject( placePos.x, placePos.y, 
-                                  placement->objectID );
-                    
-                    if( strcmp( placement->globalMessage, "" ) != 0 ) {
-                        sendGlobalMessage( placement->globalMessage );
+                    int tryCount = 0;
+                    while( tryCount < 20 &&
+                           getMapObject( placePos.x, placePos.y ) != 0 ) {
+                        // search diagonally away for empty spot
+                        placePos.x -= 5;
+                        placePos.y -= 5;
+                        tryCount++;
                         }
+
+                    if( getMapObject( placePos.x, placePos.y ) == 0 ) {
+                        // found empty spot
+                        setMapObject( placePos.x, placePos.y, 
+                                      placement->objectID );
+                    
+                        if( strcmp( placement->globalMessage, "" ) != 0 ) {
+                            sendGlobalMessage( placement->globalMessage );
+                            }
+                        }
+                    // else gave up without finding empty spot
+                    // NEVER just replace an object with a periodic placement
+                    
                     }
                 
                 delete [] placement->globalMessage;
@@ -20221,6 +20730,15 @@ int main( int inNumArgs, const char **inArgs ) {
                                 if( nextConnection->twinCount > maxCount ) {
                                     nextConnection->twinCount = maxCount;
                                     }
+                                if( nextConnection->twinCount < 2 ) {
+                                    // don't allow twin counts of 1 or 0
+                                    // count it as if they're not even
+                                    // asking to be twins
+                                    nextConnection->twinCount = 0;
+                                    delete [] nextConnection->twinCode;
+                                    nextConnection->twinCode = NULL;
+                                    }
+                                
                                 }
                             
 
@@ -20647,6 +21165,11 @@ int main( int inNumArgs, const char **inArgs ) {
             if( nextPlayer->numToolSlots == -1 ) {
                 
                 setupToolSlots( nextPlayer );
+                }
+
+            if( nextPlayer->forcedName && ! nextPlayer->forcedNameSent ) {
+                playerIndicesToSendNamesAbout.push_back( i );
+                nextPlayer->forcedNameSent = true;
                 }
 
 
@@ -21635,7 +22158,7 @@ int main( int inNumArgs, const char **inArgs ) {
                             }
                         
                         char *message = autoSprintf(
-                            "GO\n%d %d %d %d %lf %s%s eve=%d\n#",
+                            "GO\n%d %d %d %d %f %s%s eve=%d\n#",
                             m.x - nextPlayer->birthPos.x,
                             m.y - nextPlayer->birthPos.y,
                             o->id, o->displayID, 
@@ -21656,6 +22179,63 @@ int main( int inNumArgs, const char **inArgs ) {
                     
                     delete [] defaultO.name;
                     delete defaultO.lineage;
+                    }
+                else if( m.type == STATUE ) {
+                    // immediately send ST response
+                    timeSec_t statueTime;
+
+                    char dataBuffer[MAP_STATUE_DATA_LENGTH];
+                    memset( dataBuffer, 0, MAP_STATUE_DATA_LENGTH );
+
+                    char found = getStatueData( m.x, m.y,
+                                                &statueTime, dataBuffer );
+                    
+                    if( found ) {
+                        double statueAge = computeAge( statueTime );
+                        int displayID;
+                        double age;
+                        char nameBuffer[100];
+                        char finalWordsBuffer[100];
+                        int hat, tunic, frontShoe, backShoe, bottom, backpack;
+
+                        int i = 0;
+                        while( dataBuffer[i] != '\0' ) {
+                            if( dataBuffer[i] == '|' ) {
+                                dataBuffer[i] = ' ';
+                                }
+                            i++;
+                            }
+                        
+                        int numRead = sscanf(
+                            dataBuffer,
+                            "%d %lf %99s %d %d %d %d %d %d %99s",
+                            &displayID,
+                            &age, nameBuffer,
+                            &hat, &tunic, &frontShoe, 
+                            &backShoe, &bottom, &backpack,
+                            finalWordsBuffer );
+
+                        if( numRead == 10 ) {
+                            char *message = autoSprintf( 
+                                "ST\n"
+                                "%d %d %d %f %f %s %d;%d;%d;%d;%d;%d %s\n#",
+                                m.x - nextPlayer->birthPos.x,
+                                m.y - nextPlayer->birthPos.y,
+                                displayID, age, statueAge,
+                                nameBuffer,
+                                hat, tunic, frontShoe, backShoe, 
+                                bottom, backpack,
+                                finalWordsBuffer );
+                            
+                            sendMessageToPlayer( nextPlayer, message, 
+                                             strlen( message ) );
+                            delete [] message;
+                            }
+                        else {
+                            printf( "Bad data string found in statue db: %s",
+                                    dataBuffer );
+                            }
+                        }
                     }
                 else if( m.type == OWNER ) {
                     // immediately send OW response
@@ -23018,6 +23598,31 @@ int main( int inNumArgs, const char **inArgs ) {
                              nextPlayer->lastSayTimeSeconds > 
                              minSayGapInSeconds ) {
                         
+                        
+                        // for testing, allow a player to jump to a particular
+                        // location
+                        if( false )
+                        if( strcmp( m.saidText, "JUMP" ) == 0 ) {
+                            GridPos destPos = { 20000, 0 };
+                                               
+                            nextPlayer->xd = destPos.x;
+                            nextPlayer->xs = destPos.x;
+                            nextPlayer->yd = destPos.y;
+                            nextPlayer->ys = destPos.y;
+                            
+                            FlightDest fd = {
+                                nextPlayer->id,
+                                destPos };
+
+                            newFlightDest.push_back( fd );
+
+                            nextPlayer->firstMessageSent = false;
+                            nextPlayer->firstMapSent = false;
+                            nextPlayer->inFlight = true;
+                            }
+
+
+                        
                         nextPlayer->lastSayTimeSeconds = 
                             Time::getCurrentTime();
 
@@ -23420,7 +24025,10 @@ int main( int inNumArgs, const char **inArgs ) {
                                 }
                             }
                         
-                        if( otherToForgive != NULL ) {
+                        if( otherToForgive != NULL &&
+                            isCursed( nextPlayer->email, 
+                                      otherToForgive->email ) ) {
+                            
                             clearDBCurse( nextPlayer->id, 
                                           nextPlayer->email, 
                                           otherToForgive->email );
@@ -23879,6 +24487,17 @@ int main( int inNumArgs, const char **inArgs ) {
 
                                     if( dist < getMaxChunkDimension() ) {
                                         otherPlayer->ghostDestroyed = true;
+                                        
+                                        if( otherPlayer->murderPerpEmail 
+                                            != NULL ) {
+                                            delete [] 
+                                                otherPlayer->murderPerpEmail;
+                                            }
+                                        otherPlayer->murderPerpEmail =
+                                            stringDuplicate(
+                                                nextPlayer->email );
+                                        otherPlayer->murderPerpID =
+                                            nextPlayer->id;
                                         }
                                     }
                                 }
@@ -24377,6 +24996,13 @@ int main( int inNumArgs, const char **inArgs ) {
                                                          targetObj );
                                     }
                                 
+                                // handle statue case
+                                if( targetObj->permanent &&
+                                    targetObj->isStatue ) {
+                                    
+                                    playerReadsStatue( nextPlayer,
+                                                       m.x, m.y );
+                                    }
 
                                 // try using object on this target 
                                 
@@ -25008,30 +25634,17 @@ int main( int inNumArgs, const char **inArgs ) {
                                                 startAHAPGrant(
                                                     m.x, m.y, nextPlayer );
                                                 }
+                                            if( newO != NULL &&
+                                                newO->giveClue ) {
+                                                
+                                                sendGenericClueMessage(
+                                                    nextPlayer );
+                                                }
                                             }
                                         }
                                     
-                                    if( hungryWorkCost > 0 ) {
-                                        if( nextPlayer->yummyBonusStore > 0 ) {
-                                            if( nextPlayer->yummyBonusStore
-                                                >= hungryWorkCost ) {
-                                                nextPlayer->yummyBonusStore -=
-                                                    hungryWorkCost;
-                                                hungryWorkCost = 0;
-                                                }
-                                            else {
-                                                hungryWorkCost -= 
-                                                    nextPlayer->yummyBonusStore;
-                                                nextPlayer->yummyBonusStore = 0;
-                                                }
-                                            }
-                                        
-                                        nextPlayer->foodStore -= hungryWorkCost;
-                                        
-                                        // we checked above, so player
-                                        // never is taken down below 5 here
-                                        nextPlayer->foodUpdate = true;
-                                        }
+                                    applyHungryWorkCost( nextPlayer,
+                                                         hungryWorkCost );
                                     
                                     
                                     setResponsiblePlayer( -1 );
@@ -25415,6 +26028,21 @@ int main( int inNumArgs, const char **inArgs ) {
                                             floorID );
                                         }
                                         
+                                    int hungryWorkCost = 0;
+                                
+                                    if( r != NULL && 
+                                        r->newTarget > 0 ) {
+
+                                        if( isHungryWorkBlocked( 
+                                                nextPlayer,
+                                                r->newTarget,
+                                                &hungryWorkCost ) ) {
+                                            r = NULL;
+                                        
+                                            sendHungryWorkSpeech( nextPlayer );
+                                            }
+                                        }
+                                    
 
                                     if( r != NULL && 
                                         // make sure we're not too young
@@ -25479,6 +26107,8 @@ int main( int inNumArgs, const char **inArgs ) {
                                                 usedOnFloor = true;
                                                 }
                                             }
+                                        applyHungryWorkCost( nextPlayer,
+                                                             hungryWorkCost );
                                         }
                                     }
                                 
@@ -25916,22 +26546,13 @@ int main( int inNumArgs, const char **inArgs ) {
                                     getHitPlayer( m.x, m.y, m.id,
                                                   false, 
                                                   babyAge, -1, &hitIndex );
-                                
-                                if( hitPlayer != NULL && holdingDrugs ) {
-                                    // can't even feed baby drugs
+
+                               if( hitPlayer != NULL && holdingDrugs ) {
+                                    // can't even feed babies drugs
                                     // too confusing
                                     hitPlayer = NULL;
                                     }
-
-                                if( hitPlayer == NULL ||
-                                    hitPlayer == nextPlayer ) {
-                                    // try click on elderly
-                                    hitPlayer = 
-                                        getHitPlayer( m.x, m.y, m.id,
-                                                      false, -1, 
-                                                      55, &hitIndex );
-                                    }
-                                
+ 
                                 if( ( hitPlayer == NULL ||
                                       hitPlayer == nextPlayer )
                                     &&
@@ -27698,8 +28319,9 @@ int main( int inNumArgs, const char **inArgs ) {
                 
                 char male = ! getFemale( nextPlayer );
                 
-                if( ! nextPlayer->isTutorial )
-                recordPlayerLineage( nextPlayer->email, 
+                if( ! nextPlayer->isTutorial ) {
+                    
+                    recordPlayerLineage( nextPlayer->email, 
                                      age,
                                      nextPlayer->id,
                                      nextPlayer->parentID,
@@ -27708,6 +28330,14 @@ int main( int inNumArgs, const char **inArgs ) {
                                      nextPlayer->name,
                                      nextPlayer->lastSay,
                                      male );
+                    
+                    if( nextPlayer->rodeRocket ) {
+                        buildPostRocketStatue( nextPlayer,
+                                               nextPlayer->rodeRocketLocation );
+                        }
+                    }
+                
+                
 
 
                 // both tutorial and non-tutorial players
@@ -29420,7 +30050,9 @@ int main( int inNumArgs, const char **inArgs ) {
                     LiveObject *nextPlayer = players.getElement(j);
                     
                     // don't give mid-life tokens to twins or cursed players
+                    // or ghosts
                     if( ! nextPlayer->isTwin &&
+                        ! nextPlayer->isGhost &&
                         nextPlayer->curseStatus.curseLevel == 0 &&
                         strcmp( nextPlayer->email, email ) == 0 ) {
                         

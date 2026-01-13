@@ -350,6 +350,32 @@ static char *applyWordBlacklist( char *inSpeech ) {
                             next = &( found[lookI] );
                             }
                         
+                        if( lettersLeft == 0 ) {
+                            // got to end of target word, but maybe
+                            // the last letter repeats a bit more
+                            char nextLetter = found[lookI];
+                            while( nextLetter != '\0' && 
+                                   ( nextLetter == wordStart[ wordLen - 1 ] 
+                                     ||
+                                     nextLetter < 'A'
+                                     ||
+                                     nextLetter > 'Z' ) ) {
+                                // a match to the last letter in our
+                                // word, or a skippable character
+                                if( nextLetter == wordStart[ wordLen - 1 ] ) {
+                                    xIndex.push_back( lookI );
+                                    }
+                                // else skip the non-alpha character
+                                // This ensures that WORDD?DDD
+                                // maps to XXXXX?XXX correctly
+                            
+                                lookI++;
+                                nextLetter = found[lookI];
+                                }
+                            }
+                        
+                               
+                        
                         if( lettersLeft != 0 ) {
                             match = false;
                             }
@@ -608,6 +634,8 @@ static SimpleVector<HomePos> oldHomePosStack;
 
 // used on reconnect to decide whether to delete old home positions
 static int lastPlayerID = -1;
+static GridPos lastMapGlobalOffset = { 0, 0 };
+                                      
 
 
 
@@ -1556,6 +1584,7 @@ typedef enum messageType {
     GRAVE,
     GRAVE_MOVE,
     GRAVE_OLD,
+    STATUE_INFO,
     OWNER,
     FOLLOWING,
     EXILED,
@@ -1674,6 +1703,9 @@ messageType getMessageType( char *inMessage ) {
         }
     else if( strcmp( copy, "GO" ) == 0 ) {
         returnValue = GRAVE_OLD;
+        }
+    else if( strcmp( copy, "ST" ) == 0 ) {
+        returnValue = STATUE_INFO;
         }
     else if( strcmp( copy, "OW" ) == 0 ) {
         returnValue = OWNER;
@@ -3672,6 +3704,12 @@ LivingLifePage::~LivingLifePage() {
         }
     mGraveInfo.deleteAll();
 
+    for( int i=0; i<mStatueInfo.size(); i++ ) {
+        delete [] mStatueInfo.getElement(i)->name;
+        delete [] mStatueInfo.getElement(i)->lastWords;
+        }
+    mStatueInfo.deleteAll();
+
     clearOwnerInfo();
 
     clearLocationSpeech();
@@ -4391,6 +4429,8 @@ void LivingLifePage::handleAnimSound( int inSourcePlayerID,
                         
             double phase = anim->soundAnim[s].repeatPhase;
             
+            char shouldPlaySound = false;
+            
             if( hz != 0 ) {
                 double period = 1 / hz;
                 
@@ -4407,52 +4447,64 @@ void LivingLifePage::handleAnimSound( int inSourcePlayerID,
                                period ) );
                 
                 if( newPeriods > oldPeriods ) {
-                    SoundUsage u = anim->soundAnim[s].sound;
+                    shouldPlaySound = true;
+                    }
+                }
+            else if( hz == 0 && oldTimeVal == 0 && phase == 0 ) {
+                // always play one sound right at the start
+                // if hz is 0 and phase is 0
+                // this counts as a one-time sound
+                // played right when animation starts
+                shouldPlaySound = true;
+                }
+            
+            if( shouldPlaySound ) {
+                
+                SoundUsage u = anim->soundAnim[s].sound;
                     
                     
-                    if( anim->soundAnim[s].footstep ) {
+                if( anim->soundAnim[s].footstep ) {
                         
-                        // check if we're on a floor
+                    // check if we're on a floor
 
-                        int x = lrint( inPosX );
-                        int y = lrint( inPosY );
+                    int x = lrint( inPosX );
+                    int y = lrint( inPosY );
 
-                        int i = getMapIndex( x, y );
+                    int i = getMapIndex( x, y );
                         
-                        if( i != -1 && mMapFloors[i] > 0 ) {
+                    if( i != -1 && mMapFloors[i] > 0 ) {
                             
-                            ObjectRecord *f = getObject( mMapFloors[i] );
+                        ObjectRecord *f = getObject( mMapFloors[i] );
                             
-                            if( f->usingSound.numSubSounds > 0 ) {
-                                u = f->usingSound;
-                                }
+                        if( f->usingSound.numSubSounds > 0 ) {
+                            u = f->usingSound;
                             }
                         }
+                    }
                     
                     
                     
-                    playSound( u,
-                               getVectorFromCamera( inPosX, inPosY ) );
+                playSound( u,
+                           getVectorFromCamera( inPosX, inPosY ) );
 
-                    char *des = getObject( inObjectID )->description;
+                char *des = getObject( inObjectID )->description;
                     
-                    if( inSourcePlayerID != ourID &&
-                        strstr( des, "offScreenSound" ) != NULL ) {
-                        // this object has offscreen-visible sounds
-                        // AND its animation has sounds
-                        // renew offscreen sound for each new sound played
+                if( inSourcePlayerID != ourID &&
+                    strstr( des, "offScreenSound" ) != NULL ) {
+                    // this object has offscreen-visible sounds
+                    // AND its animation has sounds
+                    // renew offscreen sound for each new sound played
                         
-                        // these have very short fade
-                        // so that we don't have a bunch of overlap
-                        addOffScreenSound(
-                            inSourcePlayerID,
-                            inPosX *
-                            CELL_D, 
-                            inPosY *
-                            CELL_D,
-                            des,
-                            0.5 );
-                        }
+                    // these have very short fade
+                    // so that we don't have a bunch of overlap
+                    addOffScreenSound(
+                        inSourcePlayerID,
+                        inPosX *
+                        CELL_D, 
+                        inPosY *
+                        CELL_D,
+                        des,
+                        0.5 );
                     }
                 }
             }
@@ -4902,6 +4954,86 @@ void LivingLifePage::drawMapCell( int inMapI,
                 }
             }
         
+
+        if( oRecord->isStatue ) {
+            int x = inMapI % mMapD;
+            int y = inMapI / mMapD;
+            
+            int worldY = y + mMapOffsetY - mMapD / 2;
+
+            int worldX = x + mMapOffsetX - mMapD / 2;
+            
+            GridPos worldPos = { worldX, worldY };
+            
+            StatueInfo *si = NULL;
+            
+            for( int s=0; s<mStatueInfo.size(); s++ ) {
+                if( equal( mStatueInfo.getElement(s)->worldPos, worldPos ) ) {
+                    si = mStatueInfo.getElement( s );
+                    break;
+                    }
+                }
+
+            if( si != NULL ) {
+
+                char unused;
+                
+                ObjectAnimPack p = 
+                    drawObjectAnimPacked( 
+                        si->displayID, ground, 
+                        0,
+                        0,
+                        ground,
+                        0,
+                        0,
+                        &unused,
+                        endAnimType,
+                        endAnimType,
+                        passPos,
+                        0,
+                        false,
+                        false,
+                        si->personAgeYears,
+                        false,
+                        false,
+                        false,
+                        si->clothing,
+                        NULL,
+                        0,
+                        NULL, NULL );
+                
+                toggleGrayscaleDrawing( true, 0.6, 32 );
+                
+                drawObjectAnim( p );
+
+                toggleGrayscaleDrawing( false );
+
+                // does statue object have a +overlay?
+
+                if( oRecord->overlayID > 0 ) {
+                    ObjectRecord *overlayObject
+                        = getObject( oRecord->overlayID );
+
+                    // this is safe to do only if statue object
+                    // has +noHighlight
+
+                    startAddingToStencil( false, true, 0.95 );
+                    drawObjectAnim( p );
+                
+                    startDrawingThroughStencil();
+                
+                    drawObject( overlayObject, passPos,
+                                0, false, false, 0,
+                                0,
+                                false,
+                                false,
+                                getEmptyClothingSet(),
+                                0, NULL, NULL );
+                
+                    stopStencil();
+                    }
+                }
+            }
 
 
 
@@ -11202,8 +11334,8 @@ void LivingLifePage::draw( doublePair inViewCenter,
                         if( !alreadySent ) {                            
                             char *graveMessage = 
                                 autoSprintf( "GRAVE %d %d#",
-                                             mCurMouseOverWorld.x,
-                                             mCurMouseOverWorld.y );
+                                             sendX( mCurMouseOverWorld.x ),
+                                             sendY( mCurMouseOverWorld.y ) );
                             
                             sendToServerSocket( graveMessage );
                             delete [] graveMessage;
@@ -11289,8 +11421,8 @@ void LivingLifePage::draw( doublePair inViewCenter,
                         if( !alreadySent ) {                            
                             char *ownerMessage = 
                                 autoSprintf( "OWNER %d %d#",
-                                             mCurMouseOverWorld.x,
-                                             mCurMouseOverWorld.y );
+                                             sendX( mCurMouseOverWorld.x ),
+                                             sendY( mCurMouseOverWorld.y ) );
                             
                             sendToServerSocket( ownerMessage );
                             delete [] ownerMessage;
@@ -13177,7 +13309,26 @@ void LivingLifePage::displayPhoto( const char *inPhotoID, char inNegative ) {
     }
 
 
+void LivingLifePage::checkForStatueAtPosition( int inWorldX, int inWorldY ) {
+    
+    GridPos worldPos = { inWorldX, inWorldY };
 
+    for( int s=0; s<mStatueInfo.size(); s++ ) {
+        if( equal( mStatueInfo.getElement(s)->worldPos, worldPos ) ) {
+            // already present
+            return;
+            }
+        }
+
+    // else send request
+    char *message = 
+        autoSprintf( "STATUE %d %d#",
+                     sendX( inWorldX ), sendY( inWorldY ) );
+    sendToServerSocket( message );
+    delete [] message;
+    }
+
+        
 // color list from here:
 // https://sashat.me/2017/01/11/list-of-20-simple-distinct-colors/
 
@@ -13520,6 +13671,20 @@ void LivingLifePage::step() {
                     mMapAnimationFrozenRotFrameCount[ i ] = 
                         mMapAnimationLastFrameCount[ i ];
                     
+                    if( ! mMapAnimationFrozenRotFrameCountUsed[ i ] ) {
+                        
+                        // reset frame count when we
+                        // switch to ground from moving if we have a
+                        // forceZeroStart
+                        AnimationRecord *newAnim =
+                            getAnimation( mMap[ i ], ground );
+                                    
+                        if( newAnim != NULL  && 
+                            newAnim->forceZeroStart ) {
+                            mMapAnimationFrameCount[ i ] = 0;
+                            mMapAnimationLastFrameCount[ i ] = 0;
+                            }
+                        } 
                     }
                 }
             else {
@@ -15574,6 +15739,93 @@ void LivingLifePage::step() {
                 mGraveInfo.push_back( g );
                 }
             }
+        else if( type == STATUE_INFO ) {
+            int posX, posY, displayID;
+            double age;
+            double statueAge;
+ 
+
+            char nameBuffer[100];
+            char clothingBuffer[60];
+            char finalWordsBuffer[100];
+            
+            int numRead = sscanf( message, "ST\n%d %d %d %lf %lf "
+                                  "%99s %99s %99s",
+                                  &posX, &posY, &displayID,
+                                  &age, &statueAge, nameBuffer, clothingBuffer,
+                                  finalWordsBuffer );
+            if( numRead == 8 ) {
+                applyReceiveOffset( &posX, &posY );
+
+                GridPos thisPos = { posX, posY };
+
+                
+                int nameLen = strlen( nameBuffer );
+                for( int i=0; i<nameLen; i++ ) {
+                    if( nameBuffer[i] == '_' ) {
+                        nameBuffer[i] = ' ';
+                        }
+                    }
+                int wordsLen = strlen( finalWordsBuffer );
+                for( int i=0; i<wordsLen; i++ ) {
+                    if( finalWordsBuffer[i] == '_' ) {
+                        finalWordsBuffer[i] = ' ';
+                        }
+                    }
+
+                ClothingSet clothing = getEmptyClothingSet();
+                
+                int numClothes;
+                char **clothesParts = split( clothingBuffer, ";", &numClothes );
+
+                if( numClothes == NUM_CLOTHING_PIECES ) {
+                    for( int i=0; i <NUM_CLOTHING_PIECES; i++ ) {
+                        int readID = 0;
+                        
+                        sscanf( clothesParts[i], "%d", &readID );
+                        
+                        if( readID > 0 ) {
+                            setClothingByIndex( &( clothing ), 
+                                                i, 
+                                                getObject( readID ) ); 
+                            }
+                        }
+                    }
+                
+                for( int i=0; i<numClothes; i++ ) {
+                    delete [] clothesParts[i];
+                    }
+                delete [] clothesParts;
+                
+                LiveObject *ourLiveObject = getOurLiveObject();
+                
+                double creationTime = 
+                    game_getCurrentTime() - statueAge / ourLiveObject->ageRate;
+
+                StatueInfo info = {
+                    thisPos,
+                    displayID,
+                    stringDuplicate( nameBuffer ),
+                    stringDuplicate( finalWordsBuffer ),
+                    clothing,
+                    age,
+                    creationTime
+                    };
+                
+                for( int i=0; i<mStatueInfo.size(); i++ ) {
+                    StatueInfo *otherInfo = mStatueInfo.getElement( i );
+                    
+                    if( equal( otherInfo->worldPos, thisPos ) ) {
+                        // replacing this one
+                        delete [] otherInfo->name;
+                        delete [] otherInfo->lastWords;
+                        mStatueInfo.deleteElement( i );
+                        i--;
+                        }
+                    }
+                mStatueInfo.push_back( info );
+                }
+            }
         else if( type == OWNER ) {
             SimpleVector<char*> *tokens = tokenizeString( message );
             
@@ -15583,6 +15835,8 @@ void LivingLifePage::step() {
                 
                 sscanf( tokens->getElementDirect( 1 ), "%d", &x );
                 sscanf( tokens->getElementDirect( 2 ), "%d", &y );
+                
+                applyReceiveOffset( &x, &y );
                 
                 GridPos thisPos = { x, y };
                 
@@ -15805,6 +16059,8 @@ void LivingLifePage::step() {
             int numRead = sscanf( message, "VU\n%d %d",
                                   &posX, &posY );
             if( numRead == 2 ) {
+                applyReceiveOffset( &posX, &posY );
+                
                 vogModeActuallyOn = true;
                 
                 vogPos.x = posX;
@@ -16182,7 +16438,18 @@ void LivingLifePage::step() {
                                 // our placement status cleared
                                 mMapPlayerPlacedFlags[mapI] = false;
                                 }
-
+                            
+                            if( mMap[mapI] != 0 ) {
+                                ObjectRecord *obj = getObject( mMap[mapI] );
+                                
+                                if( obj->isStatue ) {
+                                    int worldPosX = x + cX;
+                                    int worldPosY = y + cY;
+                                    checkForStatueAtPosition(
+                                        worldPosX, worldPosY ); 
+                                    }
+                                }
+                            
                             mMapContainedStacks[mapI].deleteAll();
                             mMapSubContainedStacks[mapI].deleteAll();
                             
@@ -16547,10 +16814,37 @@ void LivingLifePage::step() {
                                     LiveObject *causingPlayer =
                                         getLiveObject( - responsiblePlayerID );
 
-                                    if( causingPlayer != NULL &&
-                                        causingPlayer->holdingID 
-                                        != oldContID ) {
+                                    char swapHappened = false;
+                                    
+                                    if( causingPlayer != NULL ) {
                                         
+                                        if( causingPlayer->holdingID 
+                                            == oldContID ) {
+                                            swapHappened = true;
+                                            }
+                                        else {
+                                            // what player is holding
+                                            // does not match what used
+                                            // to be in container
+                                            // But maybe there was a bare-hand
+                                            // pick up transition that caused
+                                            // this change?
+                                            TransRecord *pickup =
+                                                getTrans( 0, oldContID );
+                                            
+                                            if( pickup != NULL &&
+                                                pickup->newActor ==
+                                                causingPlayer->holdingID ) {
+                                                swapHappened = true;
+                                                }
+                                            }
+                                        }
+                                    
+
+                                    if( ! swapHappened ) {
+                                        // a player swap action
+                                        // didn't cause this change
+                                        // to the contained item
 
                                         ObjectRecord *newObj = 
                                             getObject( newContID );
@@ -16603,6 +16897,15 @@ void LivingLifePage::step() {
                             mMapContainedStacks[mapI].deleteAll();
                             mMapSubContainedStacks[mapI].deleteAll();
                             }
+
+                        if( newID > 0 ) {
+                            ObjectRecord *newObj = getObject( newID );
+                            
+                            if( newObj->isStatue ) {
+                                checkForStatueAtPosition( x, y );
+                                }
+                            }
+                        
                         
                         if( speed > 0 ) {
                             // this cell moved from somewhere
@@ -16708,6 +17011,20 @@ void LivingLifePage::step() {
                                         mMapAnimationFrameCount[ mapI ] =
                                             mMapAnimationFrozenRotFrameCount[ 
                                                 oldMapI ];
+                                        }
+                                    else {
+                                        // reset frame count when we
+                                        // switch to moving if we have a
+                                        // forceZeroStart
+                                        AnimationRecord *newAnim =
+                                            getAnimation( mMap[mapI], moving );
+                                    
+                                        if( newAnim != NULL  && 
+                                            newAnim->forceZeroStart ) {
+                                            mMapAnimationFrameCount[mapI] = 0;
+                                            mMapAnimationLastFrameCount[mapI] =
+                                                0;
+                                            }
                                         }
                                     }
                                 
@@ -19593,10 +19910,17 @@ void LivingLifePage::step() {
                     // different ID than last time, delete old home markers
                     oldHomePosStack.deleteAll();
                     }
+                else if( distance( mMapGlobalOffset, 
+                                   lastMapGlobalOffset ) != 0 ) {
+                    // global offset changed, home pos are off now
+                    oldHomePosStack.deleteAll();
+                    }
+                    
                 homePosStack.push_back_other( &oldHomePosStack );
 
                 lastPlayerID = ourID;
-
+                lastMapGlobalOffset = mMapGlobalOffset;
+                
                 // we have no measurement yet
                 ourObject->lastActionSendStartTime = 0;
                 ourObject->lastResponseTimeDelta = 0;
@@ -20554,6 +20878,8 @@ void LivingLifePage::step() {
                                         
 
                                         if( numRead == 2 || numRead == 3 ) {
+                                            applyReceiveOffset( &mapX, &mapY );
+                                            
                                             addTempHomeLocation( mapX, mapY,
                                                                  person,
                                                                  personID,
@@ -20748,6 +21074,7 @@ void LivingLifePage::step() {
                 
                 
                 if( numRead == 2 ) {
+                    applyReceiveOffset( &x, &y );
                     
                     char *firstSpace = strstr( lines[i], " " );
 
@@ -23474,6 +23801,12 @@ void LivingLifePage::makeActive( char inFresh ) {
         delete [] mGraveInfo.getElement(i)->relationName;
         }
     mGraveInfo.deleteAll();
+
+    for( int i=0; i<mStatueInfo.size(); i++ ) {
+        delete [] mStatueInfo.getElement(i)->name;
+        delete [] mStatueInfo.getElement(i)->lastWords;
+        }
+    mStatueInfo.deleteAll();
 
     clearOwnerInfo();
     
@@ -27150,7 +27483,8 @@ void LivingLifePage::specialKeyDown( int inKeyCode ) {
             newPos.y += posOffset.y;
             
             char *message = autoSprintf( "VOGM %d %d#",
-                                         newPos.x, newPos.y );
+                                         sendX( newPos.x ), 
+                                         sendY( newPos.y ) );
             sendToServerSocket( message );
             delete [] message;
             }
@@ -27302,8 +27636,8 @@ void LivingLifePage::actionPerformed( GUIComponent *inTarget ) {
         
         if( objectID != -1 ) {
             char *message = autoSprintf( "VOGI %d %d %d#",
-                                         lrint( vogPos.x ), 
-                                         lrint( vogPos.y ), objectID );
+                                         sendX( lrint( vogPos.x ) ), 
+                                         sendY( lrint( vogPos.y ) ), objectID );
             
             sendToServerSocket( message );
             
