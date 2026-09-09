@@ -4,6 +4,16 @@ http://onehouronelife.com/updateLog.php
 
 
 
+Server Fixes:
+
+--Before, we were skipping ghosts, d-town, tutorial, etc. when moving everyone
+  back around 0,0 post-apocalypse.  Now every gets moved.  So ghosts cannot hide
+  through an apocalypse.  This also brings d-town residents back, but only until
+  the end of their current life.  Temporary chaos is fine.
+
+
+
+
 Version 438   2026-August-20
 
 --New /nochat and /yeschat command to disable and re-enable seeing in-game
