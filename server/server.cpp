@@ -25052,6 +25052,19 @@ int main( int inNumArgs, const char **inArgs ) {
                                         
                                     sendGlobalMessage( message,
                                                        nextPlayer );
+
+                                    char *psMessage = 
+                                        autoSprintf( "PS\n"
+                                                     "%d/0 %s\n#",
+                                                     nextPlayer->id,
+                                                     message );
+                            
+                                    sendMessageToPlayer( nextPlayer, 
+                                                         psMessage, 
+                                                         strlen( psMessage ) );
+
+                                    delete [] psMessage;
+                                
                                     delete [] message;
                                     }
                                 else {

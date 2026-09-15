@@ -11,6 +11,9 @@ Server Fixes:
   through an apocalypse.  This also brings d-town residents back, but only until
   the end of their current life.  Temporary chaos is fine.
 
+--Fixed to make certain messages visible to tutorial players (who can't
+  generally see global messages).
+
 
 
 
