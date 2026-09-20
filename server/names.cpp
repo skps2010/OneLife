@@ -19,6 +19,7 @@ static int firstNamesFemaleLen;
 static int lastNamesLen;
 
 
+static JenkinsRandomSource namesRandSource;
 
 
 
@@ -142,7 +143,7 @@ int getNameOffsetForward( char *inNameList, int inListLen, int inOffset ) {
 
 
 
-const char *findCloseName( char *inString, char *inNameList, int inListLen,
+const char *findCloseName( const char *inString, char *inNameList, int inListLen,
                            int *outIndex = NULL ) {
     if( inNameList == NULL ) {
         return defaultName;
@@ -350,7 +351,7 @@ int getFirstNamesLen( char inFemale ) {
 
 
 // results destroyed internally when freeNames called
-const char *findCloseFirstName( char *inString, char inFemale ) {
+const char *findCloseFirstName( const char *inString, char inFemale ) {
     
     return findCloseName( inString, 
                           getFirstNamesArray( inFemale ),
@@ -359,7 +360,7 @@ const char *findCloseFirstName( char *inString, char inFemale ) {
 
 
 
-const char *findCloseLastName( char *inString ) {
+const char *findCloseLastName( const char *inString ) {
     return findCloseName( inString, lastNames, lastNamesLen );
     }
 
@@ -411,5 +412,59 @@ const char *getLastName( int inIndex, int *outNextIndex ) {
 
     return &( lastNames[ inIndex ] );
     }
+
+
+
+static const char *getRandomName( char *inNameList, int inListLen ) {
+
+    if( inNameList == NULL
+        ||
+        inListLen <= 0 ) {
+        
+        return "UNKNOWN";
+        }
+
+    int  posPick   =  namesRandSource.getRandomBoundedInt( 0, inListLen - 1 );
+    int  tryCount  =  0;
+
+    while( ( ( posPick != 0
+               &&
+               inNameList[ posPick - 1 ] != '\0' )
+             ||
+             inNameList[ posPick ] == '\0' )
+           &&
+           tryCount < 100 ) {
+
+        posPick = namesRandSource.getRandomBoundedInt( 0, inListLen - 1 );
+        
+        tryCount ++;
+        }
+
+    if( ( posPick == 0
+          ||
+          inNameList[ posPick - 1 ] == '\0' ) 
+        &&
+        inNameList[ posPick ] != '\0' ) {
+
+        return &( inNameList[ posPick ] );
+        }
+
+    return "UNKNOWN";
+    }
+
+
+
+const char *getRandomFirstName( char inFemale ) {
+    return getRandomName( getFirstNamesArray( inFemale ), 
+                          getFirstNamesLen( inFemale ) );
+    }
+
+
+
+const char *getRandomLastName() {
+    return getRandomName( lastNames,
+                          lastNamesLen );
+    }
+
 
 

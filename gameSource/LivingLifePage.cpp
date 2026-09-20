@@ -230,6 +230,8 @@ double pixelCountToDraw = 0;
 
 static SimpleVector<char*> wordBlacklist;
 
+static char noChat = 0;
+
 
 // destroyed inSpeech and returns newly-allocated string (destroyed by caller)
 // with blacklist words replaced by XXXXX
@@ -243,8 +245,13 @@ static char *applyWordBlacklist( char *inSpeech ) {
     for( int i=0; i< tokens->size(); i++ ) {
         char *word = tokens->getElementDirect( i );
         
-        if( wordBlacklist.getMatchingStringIndex( word ) != -1 ) {
+        if( noChat
+            ||
+            wordBlacklist.getMatchingStringIndex( word ) != -1 ) {
+            
             // word on blacklist
+            // or we're in noChat mode where every word is blacklisted
+            
             int wordLen = strlen( word );
             
             for( int c=0; c<wordLen; c++ ) {
@@ -2999,6 +3006,9 @@ LivingLifePage::LivingLifePage()
     
     wordBlacklist.deallocateStringElements();
 
+
+    noChat = SettingsManager::getIntSetting( "noChat",
+                                             0 );
     
     
     SimpleVector<char *> *wordList = 
@@ -7475,6 +7485,7 @@ void LivingLifePage::draw( doublePair inViewCenter,
             // for main floor, and left and right hugging floor
             // 0 to skip a pass
             int passIDs[3] = { 0, 0, 0 };
+            char fullTileHuggingFloor = false;
             
             if( oID > 0 ) {
                 passIDs[0] = oID;
@@ -7511,7 +7522,19 @@ void LivingLifePage::draw( doublePair inViewCenter,
                         
                         }
                     }
-                
+
+                if( passIDs[1] > 0 && passIDs[1] == passIDs[2] ) {
+                    // Same floor is auto-extending into this wall tile
+                    // from both sides.  Draw it once as a synthetic
+                    // hugging floor instead of drawing two adjacent
+                    // stenciled halves, which can disappear on some
+                    // OpenGL drivers.
+                    passIDs[0] = passIDs[1];
+                    passIDs[1] = 0;
+                    passIDs[2] = 0;
+                    fullTileHuggingFloor = true;
+                    }
+
 
                 if( ! drawHuggingFloor ) {
                     continue;
@@ -7568,7 +7591,7 @@ void LivingLifePage::draw( doublePair inViewCenter,
                     mMapFloorAnimationFrameCount[ mapI ] / 60.0;
                 
 
-                if( p > 0 ) {
+                if( p > 0 || fullTileHuggingFloor ) {
                     // floor hugging pass
                     
                     int numLayers = getObject( oID )->numSprites;
@@ -21036,14 +21059,13 @@ void LivingLifePage::step() {
                             
 
                             if( existing->currentSpeech != NULL ) {
-                                
-                                recordSpeech( existing->name,
-                                              existing->currentSpeech );
-                            
+
                                 existing->currentSpeech = 
                                     applyWordBlacklist( 
                                         existing->currentSpeech );
                                 
+                                recordSpeech( existing->name,
+                                              existing->currentSpeech );
                                 }
                             
 
@@ -27307,6 +27329,86 @@ void LivingLifePage::keyDown( unsigned char inASCII ) {
                                 
                                 if( firstSpace != NULL ) {
                                     addToBlacklist( firstSpace );
+                                    }
+                                }
+                            else if( commandTyped( typedText, 
+                                                   "noChatCommand",
+                                                   false ) ) {
+                                
+                                char *firstSpace = strstr( typedText, " " );
+                                
+                                int old =
+                                    SettingsManager::getIntSetting( "noChat",
+                                                                    0 );
+                                if( old == 0 ) {
+                                    SettingsManager::setSetting( "noChat",
+                                                                 1 );
+                                    
+                                    if( firstSpace != NULL ) {
+
+                                        SettingsManager::setSetting(
+                                            "noChatPW",
+                                            &( firstSpace[1] ) );
+
+                                        
+                                        }
+                                    noChat = 1;
+                                    }
+
+                                if( firstSpace != NULL ) {
+                                    // terminate so that pw is
+                                    // hidden from up-arrow history
+                                    firstSpace[0] = '\0';
+                                    }
+                                }
+                            else if( commandTyped( typedText, 
+                                                   "yesChatCommand",
+                                                   false ) ) {
+                                
+                                char *firstSpace = strstr( typedText, " " );
+                                int old =
+                                    SettingsManager::getIntSetting( "noChat",
+                                                                    0 );
+                                if( old == 1 ) {
+                                    char *oldPW =
+                                        SettingsManager::
+                                            getSettingContents( "noChatPW" );
+
+                                    if( oldPW != NULL
+                                        &&
+                                        oldPW[0] != '\0' ) {
+                                
+                                        if( firstSpace != NULL ) {
+                                            if( strcmp( oldPW,
+                                                        &( firstSpace[1] ) )
+                                                == 0 ) {
+
+                                                // pw match
+                                                SettingsManager::setSetting(
+                                                    "noChatPW", "" );
+                                                SettingsManager::setSetting(
+                                                    "noChat", 0 );
+                                                noChat = 0;
+                                                }
+                                            }
+                                        }
+                                    else {
+                                        // no pw set to check
+                                        SettingsManager::setSetting(
+                                            "noChatPW", "" );
+                                        SettingsManager::setSetting(
+                                            "noChat", 0 );
+                                        noChat = 0;
+                                        }
+                                    if( oldPW != NULL ) {
+                                        delete [] oldPW;
+                                        }
+                                    }
+                                
+                                if( firstSpace != NULL ) {
+                                    // terminate so that pw is
+                                    // hidden from up-arrow history
+                                    firstSpace[0] = '\0';
                                     }
                                 }
                             else {

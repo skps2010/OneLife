@@ -36,6 +36,8 @@ typedef struct StatRecord {
         // filled by lookup requests
         int gameCount;
         int gameTotalSeconds;
+        int accountExistedDays;
+        
         char error;
         
         const char *serverAction;
@@ -116,7 +118,8 @@ void freePlayerStats() {
 
 // returns -1 on failure, 1 on success
 int getPlayerLifeStats( char *inEmail, int *outNumLives, 
-                        int *outTotalSeconds ) {
+                        int *outTotalSeconds,
+                        int *outAccountExistedDays ) {
     
     if( useStatsServer ) {
         for( int i=0; i<doneLookups.size(); i++ ) {
@@ -132,6 +135,7 @@ int getPlayerLifeStats( char *inEmail, int *outNumLives,
                 else {
                     *outNumLives = r->gameCount;
                     *outTotalSeconds = r->gameTotalSeconds;
+                    *outAccountExistedDays = r->accountExistedDays;
                     }
                 
                 delete r->request;
@@ -180,7 +184,7 @@ int getPlayerLifeStats( char *inEmail, int *outNumLives,
                          // lookup
                          -1, 
                          request, -1,
-                         -1, -1, false, "get_sequence_number" };
+                         -1, -1, -1, false, "get_sequence_number" };
         records.push_back( r );
         // in progress
         return 0;
@@ -232,14 +236,15 @@ void recordPlayerLifeStats( char *inEmail, int inNumSecondsLived ) {
 
         StatRecord r = { stringDuplicate( inEmail ), inNumSecondsLived, 
                          request, -1, 
-                         -1, -1, false, "get_sequence_number" };
+                         -1, -1, -1, false, "get_sequence_number" };
         records.push_back( r );
         }
     else {
         int numLives = 0;
         int numSec = 0;
+        int accountExistedDays = 0;
         
-        getPlayerLifeStats( inEmail, &numLives, &numSec );
+        getPlayerLifeStats( inEmail, &numLives, &numSec, &accountExistedDays );
         
         numLives++;
         numSec += inNumSecondsLived;
@@ -358,8 +363,9 @@ void stepPlayerStats() {
                 else if( r->numGameSeconds == -1 && 
                          strstr( webResult, "OK" ) != NULL ) {
                     // lookup result
-                    sscanf( webResult, "%d\n%d\n", 
-                            &( r->gameCount ), &( r->gameTotalSeconds ) );
+                    sscanf( webResult, "%d\n%d\n%d\n", 
+                            &( r->gameCount ), &( r->gameTotalSeconds ),
+                            &( r->accountExistedDays ) );
                     }
                 
                 recordDone = true;

@@ -135,6 +135,9 @@ twinTip "GIVE FRIENDS THIS CODE AND GET BORN TOGETHER"
 twins "TWINS"
 triplets "TRIPLETS"
 quadruplets "QUADRUPLETS"
+sameFam "SAME FAMILY"
+
+sameFamExplain "(DEPENDS ON SERVER SETTINGS)"
 
 cancel "CANCEL"
 
@@ -561,6 +564,8 @@ orderCommand "/ORDER"
 motherCommand "/MOTHER"
 
 blacklistCommand "/BLACKLIST"
+noChatCommand "/NOCHAT"
+yesChatCommand "/YESCHAT"
 
 
 familyLabel "+FAMILY+"

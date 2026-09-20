@@ -3,6 +3,112 @@ This file only list changes to game code.  Changes to content can be found here:
 http://onehouronelife.com/updateLog.php
 
 
+
+Server Fixes:
+
+--Before, we were skipping ghosts, d-town, tutorial, etc. when moving everyone
+  back around 0,0 post-apocalypse.  Now every gets moved.  So ghosts cannot hide
+  through an apocalypse.  This also brings d-town residents back, but only until
+  the end of their current life.  Temporary chaos is fine.
+
+--Fixed to make certain messages visible to tutorial players (who can't
+  generally see global messages).
+
+
+
+
+Version 438   2026-August-20
+
+--New /nochat and /yeschat command to disable and re-enable seeing in-game
+  player-generated text.  Parents can use  /nochat password  to disable seeing
+  chat, and   /yeschat password   will then be required to re-enable seeing
+  chat.  /nochat applies to all speech bubble text (including read maps, etc.)
+  and to DING messages (which may contain orders from leaders).  Note that this
+  will affect tutorial DING messages to, so parents should probably wait to
+  enable this until after their child has finished the tutorial.
+
+
+
+
+Server Fixes:
+
+--Friends coordinate picking now uses a server-side secret, to make offline
+  guess-and-test brute force impossible.
+
+--Removing life/curse and food logs from public data for friends server.
+
+--Fixed two info leaks through CRC for curse name generation and property gate
+  name generation.  Now pass string through hmac_sha1 before feeding it through
+  CRC.  This will cause curse names to change, but also make it much harder to
+  map email address to their matching curse names.
+
+--Added instrumentation to log slow server steps and give a time profile.
+
+--Degenerate KILL command on your own ID is now blocked.  Some modded clients
+  were exploiting this.
+
+--Blocked long-distance probing of statue and grave locations.
+
+--Lineage server now purges non-record breaking lives that are older than 6
+  months (was 1 year before).  We had 750K lives built up, and the lineage
+  server was getting bogged again.
+
+--Actually, back to 1 year purge time.  Bots were hammering the server, and
+  that was the problem.
+
+--Lineage server now sets a cookie with your IP hash when you visit the front
+  page, and then checks for that cookie when you view individual character_page
+  pages.  Bot nets are switching IP addresses constantly and not visiting the
+  front page, so this should stop them while allowing real humans through.
+
+--Server now blocks accounts that have existed less than one year from taking
+  photos, and points the player toward a veteran player that can help them.
+
+--DULY NOTED now pops up above your head for you to see in addition to the DING
+  message.
+
+--Last Words on Statues no longer visible on mouse-over.  Too much risk of
+  troublesome messages becoming permanent fixtures in the world.  It was nice
+  while it lasted.
+
+--Accounts less than 15 days old cannot pick Eve names, and they get a DING
+  message explaining this, and an arrow toward someone who can help name them.
+
+--MOVE messages with very long paths (62+ long) are now discarded.  Before, a
+  malicious client could sent very long move messages, which would cause nearby
+  clients to lag processing them.
+
+--Emails and curse words now persist into the pastPlayers table, and curse words
+  are cached per player instead of being generated each time (if curse words are
+  global according to server settings).
+
+--Special dead players via name, any player via curse words.
+
+--Who is feature.  Duly noted was being covered up by speech.
+
+--Players who have lived more than 8 minutes without being named or picking a
+  name (as Eve) get a ranom name assigned.
+
+--Who is silent.
+
+
+
+Version 436   2026-May-9
+
+--Support for twin_count 0 to specify same family on friends-only-mode servers,
+  where twin_code is used to pick a deterministic, unguessable location on the
+  map for Eve spawns, and non-Eves are born only to people with their same twin
+  code.
+
+--Friends-only-mode servers disable expert waystones.
+
+--Fixed wall-hugging floor glitch that affected certain graphics cards.
+  Thanks to Twisted for discovering, and AdamCoulterOz for fixing.
+
+
+
+
+
 Server Fixes:
 
 --Fixed so that periodic placements only go in empty spots and never replace an
@@ -14,6 +120,22 @@ Server Fixes:
 
 --Fixed so that ghosts are ignored for nearPop stuff, periodic placements, and
   Eve placements.
+
+--Fixed so that decay is set correctly for obeject that eveStartsHolding.
+  Fixes #1230
+
+--Fixed so that tapout triggers set decay on objects changed by tapout.
+  Fixes #1228
+
+--Untrusted accounts with less than 20 total lived hours cannot curse, and have
+  their fitness scores set to 0 internally on the server (not on the
+  leaderboard), so they are last picked to inherit things.
+
+--Untrusted accounts cannot be followed.
+
+--Untrusted accounts cannot join posses.
+
+
 
 
 

@@ -46,6 +46,22 @@ cd ../OneLife/build/source
 ./makeLinuxBuild v$2
 
 
+# instead of worrying about whether these files changed, just copy
+# the old versions over into the new folder
+# our binary diff bundle should never include content changes
+rm OneLife_v$2/animations/*
+cp OneLife_v$1/animations/* OneLife_v$2/animations/
+
+rm OneLife_v$2/sprites/*
+cp OneLife_v$1/sprites/* OneLife_v$2/sprites/
+
+rm OneLife_v$2/objects/*
+cp OneLife_v$1/objects/* OneLife_v$2/objects/
+
+rm OneLife_v$2/transitions/*
+cp OneLife_v$1/transitions/* OneLife_v$2/transitions/
+
+
 ../../../minorGems/game/diffBundle/diffBundle OneLife_v$1 OneLife_v$2 $2_inc_linux.dbz
 
 

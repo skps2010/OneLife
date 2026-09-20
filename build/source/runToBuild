@@ -26,6 +26,8 @@ cd gameSource
 
 echo "Building OneLife..."
 
+touch graphics/*.tga
+
 make || exit 1
 
 
