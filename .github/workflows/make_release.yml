@@ -14,7 +14,7 @@ jobs:
       - name: packages
         run: |
           sudo apt-get update
-          sudo apt-get install git g++ make imagemagick xclip libsdl1.2-dev libglu1-mesa-dev libgl1-mesa-dev g++-mingw-w64-i686-win32 libfreetype-dev
+          sudo apt-get install git g++ make imagemagick xclip libsdl1.2-dev libglu1-mesa-dev libgl1-mesa-dev g++-mingw-w64-i686-win32 libfreetype-dev zstd
       - name: update translation
         run: curl -d "" -L https://script.google.com/macros/s/AKfycbx0agAIW99KUpLdLQX1ghFaMu81uopoQ7zNqHe7s3D5gWIZO8cb7tLRTGV8Gb8F4saC/exec # empty POST request
       - name: scripts
@@ -106,13 +106,13 @@ jobs:
           asset_content_type: application/zip
   build_macos:
     needs: build_windows
-    runs-on: macos-14
+    runs-on: macos-15-intel
     steps:
       - name: packages
         run: |
-          /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           brew install sdl12-compat
-          brew install ImageMagick
+          brew install freetype
+          brew install imagemagick
       - name: scripts
         run: |
           wget https://raw.githubusercontent.com/skps2010/OneLife/master/scripts/skps2010Scripts/skps2010Build.sh
@@ -120,7 +120,7 @@ jobs:
 
           ./skps2010Build.sh pull_only
           ./makeMacOSX.sh ${{ inputs.version }}
-      - name: upload macos #macOS
+      - name: upload macos
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

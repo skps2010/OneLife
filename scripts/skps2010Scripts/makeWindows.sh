@@ -21,9 +21,9 @@ fi
 # freetype lib for linux-windows cross compile
 if [ ! -e mingw32 ]
 then
-    wget https://mirror.msys2.org/mingw/mingw32/mingw-w64-i686-freetype-2.13.2-1-any.pkg.tar.zst
-    tar --use-compress-program=unzstd -xvf mingw-w64-i686-freetype-2.13.2-1-any.pkg.tar.zst
-    rm mingw-w64-i686-freetype-2.13.2-1-any.pkg.tar.zst
+    wget https://mirror.msys2.org/mingw/mingw32/mingw-w64-i686-freetype-2.14.3-1-any.pkg.tar.zst
+    tar --use-compress-program=unzstd -xvf mingw-w64-i686-freetype-2.14.3-1-any.pkg.tar.zst
+    rm mingw-w64-i686-freetype-2.14.3-1-any.pkg.tar.zst
 fi
 
 if [ ! -e freetype2 ]
